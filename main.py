@@ -1,6 +1,6 @@
 import os
 import sys
-
+import itertools
 import pygame
 
 pygame.init()
@@ -44,9 +44,8 @@ def generate_level(level):
             if level[y][x] == '.':
                 Tile('empty', x, y)
             elif level[y][x] == '#':
-                Tile('wall', x, y)
+                Tile('ground', x, y)
             elif level[y][x] == '@':
-                Tile('empty', x, y)
                 new_player = Player(x, y)
     return new_player, x, y
 
@@ -61,8 +60,15 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
-tile_images = {}
-player_image = load_image('sonic.png')
+tile_images = {
+    'ground': load_image('ground.png'),
+    'empty': load_image('empty.png')
+}
+
+player_image = load_image('idle.png', colorkey=-1)
+running_player_images = [load_image('run_1.png', colorkey=-1), load_image('run_2.png', colorkey=-1),
+                         load_image('run_3.png', colorkey=-1), load_image('run_4.png', colorkey=-1)]
+run_cycle = itertools.cycle(running_player_images)
 
 tile_width = tile_height = 60
 
@@ -71,26 +77,39 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
         super().__init__(tiles_group, all_sprites)
         self.image = tile_images[tile_type]
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
         self.rect = self.image.get_rect().move(
-            tile_width * pos_x, tile_height * pos_y)
+            self.width * pos_x, self.height * pos_y)
 
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(player_group, all_sprites)
         self.image = player_image
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
         self.rect = self.image.get_rect().move(
-            tile_width * pos_x + 15, tile_height * pos_y + 5)
+            self.width * pos_x, self.height * pos_y)
+
+        self.speed = 6
+        self.gravity = 1
+
+        self.crouching = False
+        self.running = False
 
     def move(self, key):
-        if key == pygame.K_UP:
-            self.rect.y -= tile_height
-        elif key == pygame.K_DOWN:
-            self.rect.y += tile_height
+        if key == pygame.K_DOWN:
+            self.image = load_image('crouch.png', colorkey=-1)
         elif key == pygame.K_LEFT:
-            self.rect.x -= tile_width
+            self.running = True
+            self.speed = -6
         elif key == pygame.K_RIGHT:
-            self.rect.x += tile_width
+            self.running = True
+            self.speed = 6
+
+    def flip(self, image):
+        self.image = pygame.transform.flip(image, True, False)
 
 
 class Camera:
@@ -123,6 +142,7 @@ if __name__ == '__main__':
         print('error')
         terminate()
 
+    clock = pygame.time.Clock()
     running = True
     while running:
         for event in pygame.event.get():
@@ -130,8 +150,19 @@ if __name__ == '__main__':
                 running = False
             if event.type == pygame.KEYDOWN:
                 player.move(event.key)
+            if event.type == pygame.KEYUP:
+                player.running = False
+                player.image = player_image
 
         screen.fill((0, 0, 0))
+
+        if player.running:
+            clock.tick(30)
+            player.rect.x += player.speed
+            image = next(run_cycle)
+            player.image = image
+            if player.speed == -6:
+                player.flip(image)
 
         camera.update(player)
         for sprite in all_sprites:
@@ -142,4 +173,5 @@ if __name__ == '__main__':
         player_group.draw(screen)
 
         pygame.display.flip()
+        clock.tick(FPS)
     pygame.quit()
