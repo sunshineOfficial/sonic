@@ -137,6 +137,10 @@ class Player(pygame.sprite.Sprite):
             self.jumping = True
             self.speed_y = 15
 
+        if key == pygame.K_SPACE and not self.jumping and not self.crouching:
+            self.jumping = True
+            self.speed_y = 15
+
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
 
@@ -181,18 +185,17 @@ if __name__ == '__main__':
             if event.type == pygame.KEYDOWN:
                 player.move(event.key)
             if event.type == pygame.KEYUP:
-                player.running = False
-                if player.crouching:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                    player.running = False
+                if event.key == pygame.K_DOWN:
                     player.rect.y -= 27
-                player.crouching = False
-                if is_running_left:
+                    player.crouching = False
+                if player.speed == -6:
                     player.flip(player_image)
                 else:
                     player.image = player_image
 
         screen.fill((0, 0, 0))
-
-        is_running_left = False
 
         if player.running and not player.jumping:
             player.rect.x += player.speed
@@ -200,9 +203,12 @@ if __name__ == '__main__':
             player.image = image
             if player.speed == -6:
                 player.flip(image)
-                is_running_left = True
-            else:
-                is_running_left = False
+        elif player.running and player.jumping:
+            player.rect.x += player.speed
+            if player.speed == 6:
+                player.rect.x += 3
+            elif player.speed == -6:
+                player.rect.x -= 3
 
         if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
             player.rect.y -= player.speed_y
@@ -214,7 +220,10 @@ if __name__ == '__main__':
             if pygame.sprite.spritecollideany(player, ground_group):
                 player.speed_y = 0
                 player.jumping = False
-                player.image = player_image
+                if player.speed == -6:
+                    player.flip(player_image)
+                else:
+                    player.image = player_image
 
         screen_update()
         clock.tick(FPS)
