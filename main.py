@@ -10,7 +10,7 @@ screen = pygame.display.set_mode(size)
 
 FPS = 60
 clock = pygame.time.Clock()
-
+timer_spindash = 0
 
 def terminate():
     pygame.quit()
@@ -85,7 +85,12 @@ run_cycle = itertools.cycle(running_player_images)
 jumping_player_images = [load_image('jump_1.png', colorkey=-1), load_image('jump_2.png', colorkey=-1),
                          load_image('jump_3.png', colorkey=-1), load_image('jump_4.png', colorkey=-1),
                          load_image('jump_5.png', colorkey=-1)]
+spindash_player_images = [load_image('spindash.png', colorkey=-1), load_image('spindash_2.png', colorkey=-1),
+                         load_image('spindash_3.png', colorkey=-1), load_image('spindash_4.png', colorkey=-1),
+                         load_image('spindash_5.png', colorkey=-1), load_image('spindash_6.png', colorkey=-1)]
+walking_player_images = []
 jump_cycle = itertools.cycle(jumping_player_images)
+spindash_cycle = itertools.cycle(spindash_player_images)
 
 tile_width = tile_height = 60
 
@@ -116,10 +121,17 @@ class Player(pygame.sprite.Sprite):
         self.crouching = False
         self.running = False
         self.jumping = False
+        self.spindashing = False
+        self.smart_crouching = False
 
     def move(self, key):
-        if key == pygame.K_DOWN and not self.jumping:
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_DOWN] and keys[pygame.K_SPACE] and not self.jumping:
+            self.spindashing = True
+
+        elif key == pygame.K_DOWN and not self.jumping:
             self.crouching = True
+            self.smart_crouching = False
             self.image = load_image('crouch.png', colorkey=-1)
             self.rect.y += 8
             screen.fill((0, 0, 0))
@@ -127,6 +139,7 @@ class Player(pygame.sprite.Sprite):
             pygame.time.wait(70)
             self.image = load_image('crouch_2.png', colorkey=-1)
             self.rect.y += 19
+            self.smart_crouching = True
         elif key == pygame.K_LEFT:
             self.running = True
             self.speed = -6
@@ -171,7 +184,7 @@ if __name__ == '__main__':
     except FileNotFoundError:
         print('error')
         terminate()
-
+    sonic_spin = False
     clock = pygame.time.Clock()
     running = True
     while running:
@@ -185,6 +198,17 @@ if __name__ == '__main__':
                 if player.crouching:
                     player.rect.y -= 27
                 player.crouching = False
+                player.smart_crouching = False
+                if timer_spindash > 0:
+                    if timer_spindash > 60:
+                        sonic_spin = True
+                        flag_spindash = 0
+                        spin_speed = 0
+                    else:
+                        pass
+                timer_spindash = 0
+                if player.spindashing and event.key == pygame.K_SPACE:
+                    player.spindashing = False
                 if is_running_left:
                     player.flip(player_image)
                 else:
@@ -193,6 +217,31 @@ if __name__ == '__main__':
         screen.fill((0, 0, 0))
 
         is_running_left = False
+        if player.spindashing and player.smart_crouching:
+            image = next(spindash_cycle)
+            player.image = image
+            timer_spindash += 1
+        if sonic_spin:
+            if flag_spindash == 0:
+                player.rect.y += 24
+            if player.speed > 0 and spin_speed == 0:
+                spin_speed = 40
+            if player.speed < 0 and spin_speed == 0:
+                spin_speed = -40
+            player.rect.x += spin_speed
+            j_image = next(jump_cycle)
+            player.image = j_image
+            flag_spindash += 1
+            if flag_spindash % 3 == 0:
+                if spin_speed > 0:
+                    spin_speed -= 1
+                else:
+                    spin_speed += 1
+
+            if spin_speed == 0:
+                sonic_spin = False
+                player.rect.y -= 24
+
 
         if player.running and not player.jumping:
             player.rect.x += player.speed
