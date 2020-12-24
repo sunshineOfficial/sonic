@@ -42,9 +42,9 @@ def generate_level(level):
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '.':
-                Tile('empty', x, y)
+                Tile('empty', x, y, tiles_group, all_sprites)
             elif level[y][x] == '#':
-                Tile('ground', x, y)
+                Tile('ground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '@':
                 new_player = Player(x, y)
     return new_player, x, y
@@ -60,6 +60,18 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
+def screen_update():
+    camera.update(player)
+    for sprite in all_sprites:
+        camera.apply(sprite)
+
+    all_sprites.update()
+    all_sprites.draw(screen)
+    player_group.draw(screen)
+
+    pygame.display.flip()
+
+
 tile_images = {
     'ground': load_image('ground.png'),
     'empty': load_image('empty.png')
@@ -70,12 +82,17 @@ running_player_images = [load_image('run_1.png', colorkey=-1), load_image('run_2
                          load_image('run_3.png', colorkey=-1), load_image('run_4.png', colorkey=-1)]
 run_cycle = itertools.cycle(running_player_images)
 
+jumping_player_images = [load_image('jump_1.png', colorkey=-1), load_image('jump_2.png', colorkey=-1),
+                         load_image('jump_3.png', colorkey=-1), load_image('jump_4.png', colorkey=-1),
+                         load_image('jump_5.png', colorkey=-1)]
+jump_cycle = itertools.cycle(jumping_player_images)
+
 tile_width = tile_height = 60
 
 
 class Tile(pygame.sprite.Sprite):
-    def __init__(self, tile_type, pos_x, pos_y):
-        super().__init__(tiles_group, all_sprites)
+    def __init__(self, tile_type, pos_x, pos_y, *args):
+        super().__init__(*args)
         self.image = tile_images[tile_type]
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
@@ -93,20 +110,32 @@ class Player(pygame.sprite.Sprite):
             self.width * pos_x, self.height * pos_y)
 
         self.speed = 6
+        self.speed_y = 0
         self.gravity = 1
 
         self.crouching = False
         self.running = False
+        self.jumping = False
 
     def move(self, key):
-        if key == pygame.K_DOWN:
+        if key == pygame.K_DOWN and not self.jumping:
+            self.crouching = True
             self.image = load_image('crouch.png', colorkey=-1)
+            self.rect.y += 8
+            screen.fill((0, 0, 0))
+            screen_update()
+            pygame.time.wait(70)
+            self.image = load_image('crouch_2.png', colorkey=-1)
+            self.rect.y += 19
         elif key == pygame.K_LEFT:
             self.running = True
             self.speed = -6
         elif key == pygame.K_RIGHT:
             self.running = True
             self.speed = 6
+        elif key == pygame.K_SPACE and not self.jumping:
+            self.jumping = True
+            self.speed_y = 15
 
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
@@ -133,6 +162,7 @@ if __name__ == '__main__':
     all_sprites = pygame.sprite.Group()
     tiles_group = pygame.sprite.Group()
     player_group = pygame.sprite.Group()
+    ground_group = pygame.sprite.Group()
 
     start_screen()
 
@@ -152,26 +182,40 @@ if __name__ == '__main__':
                 player.move(event.key)
             if event.type == pygame.KEYUP:
                 player.running = False
-                player.image = player_image
+                if player.crouching:
+                    player.rect.y -= 27
+                player.crouching = False
+                if is_running_left:
+                    player.flip(player_image)
+                else:
+                    player.image = player_image
 
         screen.fill((0, 0, 0))
 
-        if player.running:
-            clock.tick(30)
+        is_running_left = False
+
+        if player.running and not player.jumping:
             player.rect.x += player.speed
             image = next(run_cycle)
             player.image = image
             if player.speed == -6:
                 player.flip(image)
+                is_running_left = True
+            else:
+                is_running_left = False
 
-        camera.update(player)
-        for sprite in all_sprites:
-            camera.apply(sprite)
+        if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
+            player.rect.y -= player.speed_y
+            player.speed_y -= player.gravity
+            j_image = next(jump_cycle)
+            player.image = j_image
+            if player.speed_y < -15:
+                player.speed_y = -15
+            if pygame.sprite.spritecollideany(player, ground_group):
+                player.speed_y = 0
+                player.jumping = False
+                player.image = player_image
 
-        all_sprites.update()
-        all_sprites.draw(screen)
-        player_group.draw(screen)
-
-        pygame.display.flip()
+        screen_update()
         clock.tick(FPS)
     pygame.quit()
