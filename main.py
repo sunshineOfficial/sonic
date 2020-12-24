@@ -133,6 +133,9 @@ class Player(pygame.sprite.Sprite):
         elif key == pygame.K_RIGHT:
             self.running = True
             self.speed = 6
+        elif key == pygame.K_SPACE and not self.jumping:
+            self.jumping = True
+            self.speed_y = 15
 
         if key == pygame.K_SPACE and not self.jumping and not self.crouching:
             self.jumping = True
