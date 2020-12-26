@@ -63,7 +63,8 @@ def load_level(filename):
 
 
 def screen_update():
-    camera.update(player)
+    if not player.spindashing:
+        camera.update(player)
     for sprite in all_sprites:
         camera.apply(sprite)
 
@@ -91,13 +92,20 @@ spindash_player_images = [load_image('spindash.png', colorkey=-1), load_image('s
                           load_image('spindash_3.png', colorkey=-1), load_image('spindash_4.png', colorkey=-1),
                           load_image('spindash_5.png', colorkey=-1), load_image('spindash_6.png', colorkey=-1)]
 
+dust_spindash_player_images = [load_image('dust.png', colorkey=-1), load_image('dust_2.png', colorkey=-1),
+                          load_image('dust_3.png', colorkey=-1), load_image('dust_4.png', colorkey=-1),
+                          load_image('dust_5.png', colorkey=-1), load_image('dust_6.png', colorkey=-1)]
+
 walking_player_images = [load_image('walk.png', colorkey=-1), load_image('walk_2.png', colorkey=-1),
                          load_image('walk_3.png', colorkey=-1), load_image('walk_4.png', colorkey=-1),
                          load_image('walk_5.png', colorkey=-1), load_image('walk_6.png', colorkey=-1),
                          load_image('walk_7.png', colorkey=-1), load_image('walk_8.png', colorkey=-1)]
+
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
+dust_cycle = itertools.cycle(dust_spindash_player_images)
+
 tile_width = tile_height = 60
 
 
@@ -134,6 +142,9 @@ class Player(pygame.sprite.Sprite):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_DOWN] and keys[pygame.K_SPACE] and not self.jumping:
             self.spindashing = True
+
+        elif (keys[pygame.K_DOWN] and keys[pygame.K_RIGHT]) or (keys[pygame.K_DOWN] and keys[pygame.K_LEFT]):
+            pass
 
         elif key == pygame.K_DOWN and not self.jumping:
             self.crouching = True
@@ -231,7 +242,15 @@ if __name__ == '__main__':
         is_running_left = False
 
         if player.spindashing and player.smart_crouching:
-            image = next(spindash_cycle)
+            if timer_spindash > 60:
+                if timer_spindash == 61:
+                    if player.speed > 0:
+                        player.rect.x -= 43
+                image = next(dust_cycle)
+                sleep(0.06)
+
+            else:
+                image = next(spindash_cycle)
             player.image = image
             if player.speed == -6:
                 player.flip(image)
@@ -248,11 +267,12 @@ if __name__ == '__main__':
             j_image = next(jump_cycle)
             player.image = j_image
             flag_spindash += 1
-            if flag_spindash % 3 == 0 and abs(spin_speed) != 20 and not finish_spin:
+            if flag_spindash % 3 == 0 and not finish_spin:
                 if spin_speed > 0:
                     spin_speed -= 1
                 else:
                     spin_speed += 1
+
             if player.jumping:
                 if not walk_key:
                     player.rect.y -= 24
@@ -270,13 +290,15 @@ if __name__ == '__main__':
             player.image = j_image
             if spin_speed < 0:
                 player.flip(j_image)
-            if spin_speed == 7 or spin_speed == -7:
+            if abs(spin_speed) == 1:
+                if not finish_spin:
+                    player.rect.y -= 24
                 sonic_spin = False
                 player.image = player_image
                 if spin_speed < 0:
                     player.flip(player_image)
 
-        if player.running and not player.jumping:
+        if player.running and not player.jumping and not sonic_spin:
             player.rect.x += player.speed
             image = next(run_cycle)
             player.image = image
