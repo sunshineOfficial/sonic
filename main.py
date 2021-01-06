@@ -127,9 +127,10 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(
             self.width * pos_x, self.height * pos_y)
 
-        self.speed = 6
+        self.speed = 0
         self.speed_y = 0
         self.gravity = 1
+        self.counter = 0
 
         self.crouching = False
         self.running = False
@@ -150,22 +151,22 @@ class Player(pygame.sprite.Sprite):
             self.smart_crouching = False
             self.image = load_image('crouch.png', colorkey=-1)
             self.rect.y += 8
-            if self.speed == -6:
+            if self.speed < 0:
                 self.flip(self.image)
             screen.fill((0, 0, 0))
             screen_update()
             pygame.time.wait(70)
             self.image = load_image('crouch_2.png', colorkey=-1)
             self.rect.y += 19
-            if self.speed == -6:
+            if self.speed < 0:
                 self.flip(self.image)
             self.smart_crouching = True
         elif key == pygame.K_LEFT:
             self.running = True
-            self.speed = -6
+            self.speed = -1
         elif key == pygame.K_RIGHT:
             self.running = True
-            self.speed = 6
+            self.speed = 1
         elif key == pygame.K_SPACE and not self.jumping:
             self.jumping = True
             self.speed_y = 15
@@ -236,7 +237,7 @@ if __name__ == '__main__':
                 timer_spindash = 0
                 if player.spindashing and event.key == pygame.K_SPACE:
                     player.spindashing = False
-                if player.speed == -6:
+                if player.speed < 0:
                     player.flip(player_image)
                 else:
                     player.image = player_image
@@ -254,7 +255,7 @@ if __name__ == '__main__':
             else:
                 image = next(spindash_cycle)
             player.image = image
-            if player.speed == -6:
+            if player.speed < 0:
                 player.flip(image)
             timer_spindash += 1
 
@@ -301,16 +302,32 @@ if __name__ == '__main__':
                     player.flip(player_image)
 
         if player.running and not player.jumping and not sonic_spin:
+            if -10 < player.speed < 0:
+                if player.counter % 10 == 0:
+                    player.speed -= 1
+                player.counter += 1
+                sleep(0.04)
+            elif 10 > player.speed > 0:
+                if player.counter % 10 == 0:
+                    player.speed += 1
+                player.counter += 1
+                sleep(0.04)
+            else:
+                player.counter = 0
+
             player.rect.x += player.speed
-            image = next(run_cycle)
+            if abs(player.speed) < 10:
+                image = next(walking_cycle)
+            else:
+                image = next(run_cycle)
             player.image = image
-            if player.speed == -6:
+            if player.speed < 0:
                 player.flip(image)
         elif player.running and player.jumping:
             player.rect.x += player.speed
-            if player.speed == 6:
+            if player.speed > 0:
                 player.rect.x += 3
-            elif player.speed == -6:
+            elif player.speed < 0:
                 player.rect.x -= 3
 
         if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
@@ -318,12 +335,14 @@ if __name__ == '__main__':
             player.speed_y -= player.gravity
             j_image = next(jump_cycle)
             player.image = j_image
+            if player.speed < 0:
+                player.flip(j_image)
             if player.speed_y < -15:
                 player.speed_y = -15
             if pygame.sprite.spritecollideany(player, ground_group):
                 player.speed_y = 0
                 player.jumping = False
-                if player.speed == -6:
+                if player.speed < 0:
                     player.flip(player_image)
                 else:
                     player.image = player_image
