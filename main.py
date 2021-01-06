@@ -63,7 +63,8 @@ def load_level(filename):
 
 
 def screen_update():
-    camera.update(player)
+    if not player.spindashing:
+        camera.update(player)
     for sprite in all_sprites:
         camera.apply(sprite)
 
@@ -243,6 +244,63 @@ if __name__ == '__main__':
                     player.image = player_image
 
         screen.fill((0, 0, 0))
+        
+        if player.spindashing and player.smart_crouching:
+            if timer_spindash > 60:
+                if timer_spindash == 61:
+                    if player.speed > 0:
+                        player.rect.x -= 43
+                image = next(dust_cycle)
+                sleep(0.06)
+
+            else:
+                image = next(spindash_cycle)
+            player.image = image
+            if player.speed == -6:
+                player.flip(image)
+            timer_spindash += 1
+
+        if sonic_spin:
+            if flag_spindash == 0:
+                player.rect.y += 24
+            if player.speed > 0 and spin_speed == 0:
+                spin_speed = 40
+            if player.speed < 0 and spin_speed == 0:
+                spin_speed = -40
+            player.rect.x += spin_speed
+            j_image = next(jump_cycle)
+            player.image = j_image
+            flag_spindash += 1
+            if flag_spindash % 3 == 0 and not finish_spin:
+                if spin_speed > 0:
+                    spin_speed -= 1
+                else:
+                    spin_speed += 1
+
+            if player.jumping:
+                if not walk_key:
+                    player.rect.y -= 24
+                walk_key = True
+            if not player.jumping and walk_key is True and pygame.sprite.spritecollideany(player, ground_group):
+                j_image = next(walking_cycle)
+                sleep(0.06)
+                finish_spin = True
+                if spin_speed > 0:
+                    spin_speed -= 1
+                else:
+                    spin_speed += 1
+            else:
+                j_image = next(jump_cycle)
+            player.image = j_image
+            if spin_speed < 0:
+                player.flip(j_image)
+            if abs(spin_speed) == 1:
+                if not finish_spin:
+                    player.rect.y -= 24
+                sonic_spin = False
+                player.image = player_image
+                if spin_speed < 0:
+                    player.flip(player_image)
 
         if player.spindashing and player.smart_crouching:
             if timer_spindash > 60:
