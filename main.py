@@ -96,10 +96,14 @@ dust_spindash_player_images = [load_image('dust.png', colorkey=-1), load_image('
                                load_image('dust_3.png', colorkey=-1), load_image('dust_4.png', colorkey=-1),
                                load_image('dust_5.png', colorkey=-1), load_image('dust_6.png', colorkey=-1)]
 
-walking_player_images = [load_image('walk.png', colorkey=-1), load_image('walk_2.png', colorkey=-1),
-                         load_image('walk_3.png', colorkey=-1), load_image('walk_4.png', colorkey=-1),
-                         load_image('walk_5.png', colorkey=-1), load_image('walk_6.png', colorkey=-1),
-                         load_image('walk_7.png', colorkey=-1), load_image('walk_8.png', colorkey=-1)]
+walking_player_images = [load_image('walk.png', colorkey=-1), load_image('walk.png', colorkey=-1),
+                         load_image('walk_2.png', colorkey=-1), load_image('walk_2.png', colorkey=-1),
+                         load_image('walk_3.png', colorkey=-1), load_image('walk_3.png', colorkey=-1),
+                         load_image('walk_4.png', colorkey=-1), load_image('walk_4.png', colorkey=-1),
+                         load_image('walk_5.png', colorkey=-1), load_image('walk_5.png', colorkey=-1),
+                         load_image('walk_6.png', colorkey=-1), load_image('walk_6.png', colorkey=-1),
+                         load_image('walk_7.png', colorkey=-1), load_image('walk_7.png', colorkey=-1),
+                         load_image('walk_8.png', colorkey=-1), load_image('walk_8.png', colorkey=-1)]
 
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
@@ -128,7 +132,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(
             self.width * pos_x, self.height * pos_y)
 
-        self.speed = 0
+        self.speed = 1
         self.speed_y = 0
         self.gravity = 1
         self.counter = 0
@@ -138,8 +142,6 @@ class Player(pygame.sprite.Sprite):
         self.jumping = False
         self.spindashing = False
         self.smart_crouching = False
-
-
 
     def move(self, key):
         keys = pygame.key.get_pressed()
@@ -170,10 +172,6 @@ class Player(pygame.sprite.Sprite):
         elif key == pygame.K_RIGHT:
             self.running = True
             self.speed = 1
-        elif key == pygame.K_SPACE and not self.jumping:
-            self.jumping = True
-            self.speed_y = 15
-
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump:
             self.jumping = True
             self.speed_y = 15
@@ -312,11 +310,10 @@ if __name__ == '__main__':
                     if not walk_key:
                         player.rect.y -= 16
                         walk_key = True
-
                 if not player.jumping and walk_key is True and pygame.sprite.spritecollideany(player, ground_group):
                     j_image = next(walking_cycle)
                     stop_jump = True
-                    sleep(0.06)
+                    sleep(0.04)
                     finish_spin = True
                     if spin_speed > 0:
                         spin_speed -= 1
