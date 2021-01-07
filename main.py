@@ -128,9 +128,10 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(
             self.width * pos_x, self.height * pos_y)
 
-        self.speed = 10
+        self.speed = 0
         self.speed_y = 0
         self.gravity = 1
+        self.counter = 0
 
         self.crouching = False
         self.running = False
@@ -165,10 +166,14 @@ class Player(pygame.sprite.Sprite):
             self.smart_crouching = True
         elif key == pygame.K_LEFT:
             self.running = True
-            self.speed = -10
+            self.speed = -1
         elif key == pygame.K_RIGHT:
             self.running = True
-            self.speed = 10
+            self.speed = 1
+        elif key == pygame.K_SPACE and not self.jumping:
+            self.jumping = True
+            self.speed_y = 15
+
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump:
             self.jumping = True
             self.speed_y = 15
@@ -307,6 +312,7 @@ if __name__ == '__main__':
                     if not walk_key:
                         player.rect.y -= 16
                         walk_key = True
+
                 if not player.jumping and walk_key is True and pygame.sprite.spritecollideany(player, ground_group):
                     j_image = next(walking_cycle)
                     stop_jump = True
@@ -331,8 +337,24 @@ if __name__ == '__main__':
                     stop_jump = False
 
             if player.running and not player.jumping and not sonic_spin:
+                if -10 < player.speed < 0:
+                    if player.counter % 5 == 0:
+                        player.speed -= 1
+                    player.counter += 1
+                    sleep(0.04)
+                elif 10 > player.speed > 0:
+                    if player.counter % 5 == 0:
+                        player.speed += 1
+                    player.counter += 1
+                    sleep(0.04)
+                else:
+                    player.counter = 0
+
                 player.rect.x += player.speed
-                image = next(run_cycle)
+                if abs(player.speed) < 10:
+                    image = next(walking_cycle)
+                else:
+                    image = next(run_cycle)
                 player.image = image
                 if player.speed < 0:
                     player.flip(image)
@@ -348,6 +370,8 @@ if __name__ == '__main__':
                 player.speed_y -= player.gravity
                 j_image = next(jump_cycle)
                 player.image = j_image
+                if player.speed < 0:
+                    player.flip(j_image)
                 if player.speed_y < -15:
                     player.speed_y = -15
                 if pygame.sprite.spritecollideany(player, ground_group):
