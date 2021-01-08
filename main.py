@@ -43,10 +43,12 @@ def generate_level(level):
     new_player, x, y = None, None, None
     for y in range(len(level)):
         for x in range(len(level[y])):
-            if level[y][x] == '.':
-                Tile('empty', x, y, tiles_group, all_sprites)
+            if level[y][x] == '*':
+                Tile('spikes', x, y, tiles_group, all_sprites, spikes_group)
             elif level[y][x] == '#':
                 Tile('ground', x, y, tiles_group, all_sprites, ground_group)
+            elif level[y][x] == '%':
+                Tile('underground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '@':
                 new_player = Player(x, y)
     return new_player, x, y
@@ -77,13 +79,16 @@ def screen_update():
 
 tile_images = {
     'ground': load_image('ground.png'),
-    'empty': load_image('empty.png')
+    'underground': load_image('underground.png'),
+    'empty': load_image('empty.png'),
+    'spikes': load_image('spikes.png', colorkey=-1)
 }
 
 player_image = load_image('idle.png', colorkey=-1)
+ghost_image = load_image('ghost.png')
+
 running_player_images = [load_image('run_1.png', colorkey=-1), load_image('run_2.png', colorkey=-1),
                          load_image('run_3.png', colorkey=-1), load_image('run_4.png', colorkey=-1)]
-run_cycle = itertools.cycle(running_player_images)
 
 jumping_player_images = [load_image('jump_1.png', colorkey=-1), load_image('jump_2.png', colorkey=-1),
                          load_image('jump_3.png', colorkey=-1), load_image('jump_4.png', colorkey=-1),
@@ -109,6 +114,7 @@ jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
 dust_cycle = itertools.cycle(dust_spindash_player_images)
+run_cycle = itertools.cycle(running_player_images)
 
 tile_width = tile_height = 60
 
@@ -140,6 +146,7 @@ class Player(pygame.sprite.Sprite):
         self.crouching = False
         self.running = False
         self.jumping = False
+        self.damaged = False
         self.spindashing = False
         self.smart_crouching = False
 
@@ -166,10 +173,10 @@ class Player(pygame.sprite.Sprite):
             if self.speed < 0:
                 self.flip(self.image)
             self.smart_crouching = True
-        elif key == pygame.K_LEFT:
+        elif key == pygame.K_LEFT and not self.damaged:
             self.running = True
             self.speed = -1
-        elif key == pygame.K_RIGHT:
+        elif key == pygame.K_RIGHT and not self.damaged:
             self.running = True
             self.speed = 1
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump:
@@ -178,6 +185,15 @@ class Player(pygame.sprite.Sprite):
 
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
+
+
+class Ghost(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(player_group)
+        self.image = ghost_image
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
+        self.rect = self.image.get_rect().move(pos_x, pos_y)
 
 
 class Camera:
@@ -202,6 +218,11 @@ if __name__ == '__main__':
     tiles_group = pygame.sprite.Group()
     player_group = pygame.sprite.Group()
     ground_group = pygame.sprite.Group()
+    spikes_group = pygame.sprite.Group()
+
+    ghost_right = Ghost(615, 310)
+    ghost_left = Ghost(600, 310)
+    ghost_down = Ghost(608, 318)
 
     start_screen()
 
@@ -210,6 +231,7 @@ if __name__ == '__main__':
     except FileNotFoundError:
         print('error')
         terminate()
+
     sonic_spin = False
     stop_jump = False
     clock = pygame.time.Clock()
@@ -347,7 +369,11 @@ if __name__ == '__main__':
                 else:
                     player.counter = 0
 
-                player.rect.x += player.speed
+                if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
+                    player.rect.x += player.speed
+                elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
+                    player.rect.x += player.speed
+
                 if abs(player.speed) < 10:
                     image = next(walking_cycle)
                 else:
@@ -355,12 +381,15 @@ if __name__ == '__main__':
                 player.image = image
                 if player.speed < 0:
                     player.flip(image)
-            elif player.running and player.jumping and not sonic_spin:
-                player.rect.x += player.speed
-                if player.speed == 10:
-                    player.rect.x += 3
-                elif player.speed == -10:
-                    player.rect.x -= 3
+            elif player.running and player.jumping and not sonic_spin and not player.damaged:
+                if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
+                    player.rect.x += player.speed
+                    if player.speed == 10:
+                        player.rect.x += 3
+                elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
+                    player.rect.x += player.speed
+                    if player.speed == -10:
+                        player.rect.x -= 3
 
             if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
                 player.rect.y -= player.speed_y
@@ -374,10 +403,22 @@ if __name__ == '__main__':
                 if pygame.sprite.spritecollideany(player, ground_group):
                     player.speed_y = 0
                     player.jumping = False
+                    player.damaged = False
                     if player.speed < 0:
                         player.flip(player_image)
                     else:
                         player.image = player_image
+
+            if player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group):
+                player.speed_y = 15
+                player.damaged = True
+
+            if player.damaged:
+                player.rect.x -= 5
+
+            if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
+                    not player.spindashing and not player.crouching and not sonic_spin:
+                player.rect.y -= 1
 
         screen_update()
         clock.tick(FPS)
