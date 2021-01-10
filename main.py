@@ -43,6 +43,7 @@ def load_image(name, colorkey=None):
 
 def generate_level(level):
     new_player, x, y = None, None, None
+    new_rings = []
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '*':
@@ -51,9 +52,12 @@ def generate_level(level):
                 Tile('ground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '%':
                 Tile('underground', x, y, tiles_group, all_sprites, ground_group)
+            elif level[y][x] == '&':
+                new_rings.append(Ring(x, y))
             elif level[y][x] == '@':
                 new_player = Player(x, y)
-    return new_player, x, y
+
+    return new_player, new_rings, x, y
 
 
 def load_level(filename):
@@ -79,6 +83,15 @@ def screen_update():
     pygame.display.flip()
 
 
+def image_ring_mainer(ring_count, rings):
+    rings_images = []
+    for elem in rings:
+        for other in range(ring_count * 5):
+            rings_images.append(elem)
+
+    return rings_images
+
+
 tile_images = {
     'ground': load_image('ground.png'),
     'underground': load_image('underground.png'),
@@ -88,6 +101,8 @@ tile_images = {
 
 player_image = load_image('idle.png', colorkey=-1)
 ghost_image = load_image('ghost.png')
+ring_image = load_image('ring.png', colorkey=-1)
+hurt_image = load_image('hurt.png', colorkey=-1)
 
 running_player_images = [load_image('run_1.png', colorkey=-1), load_image('run_2.png', colorkey=-1),
                          load_image('run_3.png', colorkey=-1), load_image('run_4.png', colorkey=-1)]
@@ -119,13 +134,37 @@ walking = [load_image('walk.png', colorkey=-1), load_image('walk.png', colorkey=
 for i in walking:
     for u in range(3):
         walking_player_images.append(i)
+
 local_wall = load_image('thewall.png')
+
+rings = [load_image('ring.png', colorkey=-1), load_image('ring_2.png', colorkey=-1),
+         load_image('ring_3.png', colorkey=-1), load_image('ring_4.png', colorkey=-1)]
+
+rings_sunshine = [load_image('ring_shine.png', colorkey=-1), load_image('ring_shine_2.png', colorkey=-1),
+                  load_image('ring_shine_3.png', colorkey=-1), load_image('ring_shine_4.png', colorkey=-1)]
 
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
 dust_cycle = itertools.cycle(dust_spindash_player_images)
 run_cycle = itertools.cycle(running_player_images)
+
+sound_ring = pygame.mixer.Sound("data/_music_/ring.wav")
+sound_ring.set_volume(0.2)
+
+sound_theme = pygame.mixer.Sound("data/_music_/theme.flac")
+sound_theme.set_volume(0.1)
+
+sound_jump = pygame.mixer.Sound("data/_music_/jump.wav")
+sound_jump.set_volume(0.2)
+
+sound_crouch = pygame.mixer.Sound("data/_music_/crouch.wav")
+sound_crouch.set_volume(0.2)
+
+sound_lost_of_ring = pygame.mixer.Sound("data/_music_/lost_ring.wav")
+sound_lost_of_ring.set_volume(0.2)
+
+
 
 tile_width = tile_height = 60
 
@@ -171,6 +210,7 @@ class Player(pygame.sprite.Sprite):
             pass
 
         elif key == pygame.K_DOWN and not self.jumping and not sonic_spin:
+            sound_crouch.play()
             image_timer = 0
             self.crouching = True
             self.smart_crouching = False
@@ -180,6 +220,7 @@ class Player(pygame.sprite.Sprite):
                 self.flip(self.image)
             screen.fill((0, 0, 0))
             screen.blit(local_wall, (x_field, y_field - 8))
+            screen.blit(text2, (10, 30))
             screen_update()
             while image_timer < 1000000:
                 image_timer += 1
@@ -197,10 +238,21 @@ class Player(pygame.sprite.Sprite):
             self.speed = 1
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump:
             self.jumping = True
+            sound_jump.play()
             self.speed_y = 15
 
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
+
+
+class Ring(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(player_group, all_sprites)
+        self.image = ring_image
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
+        self.rect = self.image.get_rect().move(
+            self.width * pos_x, (self.height * pos_y) + 60)
 
 
 class Ghost(pygame.sprite.Sprite):
@@ -228,6 +280,7 @@ class Camera:
 
 if __name__ == '__main__':
     player = None
+    rings_plain = None
     camera = Camera()
 
     all_sprites = pygame.sprite.Group()
@@ -235,6 +288,7 @@ if __name__ == '__main__':
     player_group = pygame.sprite.Group()
     ground_group = pygame.sprite.Group()
     spikes_group = pygame.sprite.Group()
+    rings_group = pygame.sprite.Group()
 
     ghost_right = Ghost(615, 310)
     ghost_left = Ghost(600, 310)
@@ -243,20 +297,29 @@ if __name__ == '__main__':
     start_screen()
 
     try:
-        player, level_x, level_y = generate_level(load_level('level.txt'))
+        player, rings_plain, level_x, level_y = generate_level(load_level('level.txt'))
     except FileNotFoundError:
         print('error')
         terminate()
 
+    rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
     sonic_spin = False
     stop_jump = False
+    complete_ring = []
+    shine_list = []
+    timer_shine = []
     clock = pygame.time.Clock()
+    f2 = pygame.font.Font('data/Pixel_font_sonic.ttf', 30)
     running = True
     next_way_close = False
     one_shift = False
     two_shift = False
+    rest = False
+    rest_timer = 0
     timer_dust = 0
     timer_walk = 0
+    num_of_rings = 0
+    sound_theme.play()
 
     while running:
         for event in pygame.event.get():
@@ -297,6 +360,36 @@ if __name__ == '__main__':
 
         screen.fill((0, 0, 0))
         screen.blit(local_wall, (x_field, y_field))
+        text2 = f2.render(f"RINGS:  {num_of_rings}", False, (255, 255, 255))
+
+        screen.blit(text2, (10, 25))
+
+        changes_ring, num = False, None
+        for i, elem in enumerate(rings_plain):  # Ring load
+            elem.image = next(rings_cycle)
+            if 650 > elem.rect.x > 590 and (elem.rect.y == 336 or elem.rect.y == 319 or elem.rect.y == 335):
+                sound_ring.play()
+                complete_ring.append(elem)
+                timer_shine.append((elem, 0))
+                del rings_plain[i]
+                changes_ring = True
+                num_of_rings += 1
+
+
+        if changes_ring:
+            shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
+            rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+
+        for i, elem in enumerate(complete_ring):
+            elem.image = next(shine_list[i])
+            for t in range(len(timer_shine)):
+                if timer_shine:
+                    if timer_shine[t][0] == elem:
+                        if timer_shine[t][1] > 45:
+                            del complete_ring[i]
+                            elem.image = ghost_image
+                        else:
+                            timer_shine[t] = (elem, timer_shine[t][1] + 1)
 
         if player.spindashing and player.smart_crouching and not next_way_close:
             if timer_spindash > 60:
@@ -305,7 +398,6 @@ if __name__ == '__main__':
                     if player.speed > 0:
                         player.rect.x -= 43
                 image = next(dust_cycle)
-
             else:
                 image = next(spindash_cycle)
             player.image = image
@@ -425,6 +517,7 @@ if __name__ == '__main__':
                 sonic_spin = False
 
             if player.running and not player.jumping and not sonic_spin:
+                f2 = pygame.font.Font('data/Pixel_font_sonic.ttf', 30)
                 if -10 < player.speed < 0:
                     if player.counter % 5 == 0:
                         player.speed -= 1
@@ -499,24 +592,38 @@ if __name__ == '__main__':
                         player.flip(player_image)
                     else:
                         player.image = player_image
+                    if player.damaged:
+                        rest = True
+                        rest_timer = 0
                     player.damaged = False
 
             if player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group):
                 player.speed_y = 15
                 player.damaged = True
+                f2 = pygame.font.Font('data/Pixel_font_sonic.ttf', 40)
+                sound_lost_of_ring.play()
+                if num_of_rings > 1:
+                    num_of_rings = 0
+
 
             if player.damaged:
                 player.rect.x -= 5
+                player.image = hurt_image
+
+            if rest and rest_timer != 101:
+                rest_timer += 1
+                if int(str(rest_timer)[0]) % 2 == 0:
+                    player.image = ghost_image
+                else:
+                    if not player.running and not player.jumping and not player.crouching:
+                        player.image = player_image
+            if rest_timer == 100:
+                rest = False
+                rest_timer = 0
 
             if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
                     not player.spindashing and not player.crouching and not sonic_spin:
                 player.rect.y -= 1
-
-
-
-
-
-
 
         screen_update()
         clock.tick(FPS)
