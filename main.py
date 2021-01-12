@@ -152,7 +152,7 @@ run_cycle = itertools.cycle(running_player_images)
 sound_ring = pygame.mixer.Sound("data/_music_/ring.wav")
 sound_ring.set_volume(0.2)
 
-sound_theme = pygame.mixer.Sound("data/_music_/theme.flac")
+sound_theme = pygame.mixer.Sound("data/_music_/mushroom_hill_act_1.flac")
 sound_theme.set_volume(0.1)
 
 sound_jump = pygame.mixer.Sound("data/_music_/jump.wav")
@@ -315,6 +315,7 @@ if __name__ == '__main__':
     one_shift = False
     two_shift = False
     rest = False
+    color = 'white'
     rest_timer = 0
     timer_dust = 0
     timer_walk = 0
@@ -360,7 +361,7 @@ if __name__ == '__main__':
 
         screen.fill((0, 0, 0))
         screen.blit(local_wall, (x_field, y_field))
-        text2 = f2.render(f"RINGS:  {num_of_rings}", False, (255, 255, 255))
+        text2 = f2.render(f"RINGS:  {num_of_rings}", False, color)
 
         screen.blit(text2, (10, 25))
 
@@ -517,7 +518,7 @@ if __name__ == '__main__':
                 sonic_spin = False
 
             if player.running and not player.jumping and not sonic_spin:
-                f2 = pygame.font.Font('data/Pixel_font_sonic.ttf', 30)
+                color = 'white'
                 if -10 < player.speed < 0:
                     if player.counter % 5 == 0:
                         player.speed -= 1
@@ -600,7 +601,7 @@ if __name__ == '__main__':
             if player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group):
                 player.speed_y = 15
                 player.damaged = True
-                f2 = pygame.font.Font('data/Pixel_font_sonic.ttf', 40)
+                color = 'red'
                 sound_lost_of_ring.play()
                 if num_of_rings > 1:
                     num_of_rings = 0
