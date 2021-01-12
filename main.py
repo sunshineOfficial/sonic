@@ -2,7 +2,6 @@ import os
 import sys
 import itertools
 import pygame
-from time import *
 
 pygame.init()
 pygame.display.set_caption('Sonic')
@@ -44,6 +43,9 @@ def load_image(name, colorkey=None):
 def generate_level(level):
     new_player, x, y = None, None, None
     new_rings = []
+    new_enemies = {
+        'rhino': []
+    }
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '*':
@@ -52,12 +54,14 @@ def generate_level(level):
                 Tile('ground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '%':
                 Tile('underground', x, y, tiles_group, all_sprites, ground_group)
+            elif level[y][x] == '1':
+                new_enemies['rhino'].append(Rhino(x, y))
             elif level[y][x] == '&':
                 new_rings.append(Ring(x, y))
             elif level[y][x] == '@':
                 new_player = Player(x, y)
 
-    return new_player, new_rings, x, y
+    return new_player, new_rings, new_enemies, x, y
 
 
 def load_level(filename):
@@ -143,6 +147,8 @@ rings = [load_image('ring.png', colorkey=-1), load_image('ring_2.png', colorkey=
 rings_sunshine = [load_image('ring_shine.png', colorkey=-1), load_image('ring_shine_2.png', colorkey=-1),
                   load_image('ring_shine_3.png', colorkey=-1), load_image('ring_shine_4.png', colorkey=-1)]
 
+rhino_image = load_image('rhino.png', colorkey=-1)
+
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
@@ -164,8 +170,6 @@ sound_crouch.set_volume(0.2)
 sound_lost_of_ring = pygame.mixer.Sound("data/_music_/lost_ring.wav")
 sound_lost_of_ring.set_volume(0.2)
 
-
-
 tile_width = tile_height = 60
 
 
@@ -175,8 +179,12 @@ class Tile(pygame.sprite.Sprite):
         self.image = tile_images[tile_type]
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
-        self.rect = self.image.get_rect().move(
-            self.width * pos_x, self.height * pos_y)
+        if tile_type == 'spikes':
+            self.rect = self.image.get_rect().move(
+                35 * pos_x, self.height * pos_y + 20)
+        else:
+            self.rect = self.image.get_rect().move(
+                self.width * pos_x, self.height * pos_y)
 
 
 class Player(pygame.sprite.Sprite):
@@ -186,7 +194,7 @@ class Player(pygame.sprite.Sprite):
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
         self.rect = self.image.get_rect().move(
-            self.width * pos_x, (self.height * pos_y) + 80)
+            35 * pos_x, (self.height * pos_y) + 80)
 
         self.speed = 1
         self.speed_y = 0
@@ -220,7 +228,7 @@ class Player(pygame.sprite.Sprite):
                 self.flip(self.image)
             screen.fill((0, 0, 0))
             screen.blit(local_wall, (x_field, y_field - 8))
-            screen.blit(text2, (10, 30))
+            screen.blit(text2, (10, 25))
             screen_update()
             while image_timer < 1000000:
                 image_timer += 1
@@ -239,7 +247,7 @@ class Player(pygame.sprite.Sprite):
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump:
             self.jumping = True
             sound_jump.play()
-            self.speed_y = 15
+            self.speed_y = 18
 
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
@@ -247,7 +255,7 @@ class Player(pygame.sprite.Sprite):
 
 class Ring(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
-        super().__init__(player_group, all_sprites)
+        super().__init__(all_sprites, rings_group)
         self.image = ring_image
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
@@ -262,6 +270,15 @@ class Ghost(pygame.sprite.Sprite):
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
         self.rect = self.image.get_rect().move(pos_x, pos_y)
+
+
+class Rhino(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(all_sprites, enemy_group)
+        self.image = rhino_image
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
+        self.rect = self.image.get_rect().move(35 * pos_x, self.height * pos_y + 40)
 
 
 class Camera:
@@ -281,6 +298,7 @@ class Camera:
 if __name__ == '__main__':
     player = None
     rings_plain = None
+    enemies = None
     camera = Camera()
 
     all_sprites = pygame.sprite.Group()
@@ -289,6 +307,7 @@ if __name__ == '__main__':
     ground_group = pygame.sprite.Group()
     spikes_group = pygame.sprite.Group()
     rings_group = pygame.sprite.Group()
+    enemy_group = pygame.sprite.Group()
 
     ghost_right = Ghost(615, 310)
     ghost_left = Ghost(600, 310)
@@ -297,7 +316,7 @@ if __name__ == '__main__':
     start_screen()
 
     try:
-        player, rings_plain, level_x, level_y = generate_level(load_level('level.txt'))
+        player, rings_plain, enemies, level_x, level_y = generate_level(load_level('level.txt'))
     except FileNotFoundError:
         print('error')
         terminate()
@@ -375,7 +394,6 @@ if __name__ == '__main__':
                 del rings_plain[i]
                 changes_ring = True
                 num_of_rings += 1
-
 
         if changes_ring:
             shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
@@ -584,8 +602,8 @@ if __name__ == '__main__':
                 player.image = j_image
                 if player.speed < 0:
                     player.flip(j_image)
-                if player.speed_y < -15:
-                    player.speed_y = -15
+                if player.speed_y < -18:
+                    player.speed_y = -18
                 if pygame.sprite.spritecollideany(player, ground_group):
                     player.speed_y = 0
                     player.jumping = False
@@ -598,14 +616,26 @@ if __name__ == '__main__':
                         rest_timer = 0
                     player.damaged = False
 
-            if player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group):
-                player.speed_y = 15
+            if player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group):
+                for elem in enemies['rhino']:
+                    if 700 > elem.rect.x > 550:
+                        enemies['rhino'].remove(elem)
+                        enemy_group.remove(elem)
+                        elem.image = ghost_image
+                        break
+
+                player.speed_y = 18
+                sound_lost_of_ring.play()
+
+            if (player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group)) or \
+                    (not player.jumping and pygame.sprite.spritecollideany(ghost_right, enemy_group)):
+                player.jumping = True
+                player.speed_y = 18
                 player.damaged = True
                 color = 'red'
                 sound_lost_of_ring.play()
                 if num_of_rings > 1:
                     num_of_rings = 0
-
 
             if player.damaged:
                 player.rect.x -= 5
