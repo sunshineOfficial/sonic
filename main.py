@@ -164,7 +164,8 @@ sound_crouch.set_volume(0.2)
 sound_lost_of_ring = pygame.mixer.Sound("data/_music_/lost_ring.wav")
 sound_lost_of_ring.set_volume(0.2)
 
-
+sound_spindash = pygame.mixer.Sound("data/_music_/sonic-spindash.mp3")
+sound_spindash.set_volume(0.2)
 
 tile_width = tile_height = 60
 
@@ -376,7 +377,6 @@ if __name__ == '__main__':
                 changes_ring = True
                 num_of_rings += 1
 
-
         if changes_ring:
             shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
             rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
@@ -395,6 +395,7 @@ if __name__ == '__main__':
         if player.spindashing and player.smart_crouching and not next_way_close:
             if timer_spindash > 60:
                 next_way_close = True
+                sound_spindash.play()
                 if timer_spindash == 61:
                     if player.speed > 0:
                         player.rect.x -= 43
@@ -605,7 +606,6 @@ if __name__ == '__main__':
                 sound_lost_of_ring.play()
                 if num_of_rings > 1:
                     num_of_rings = 0
-
 
             if player.damaged:
                 player.rect.x -= 5
