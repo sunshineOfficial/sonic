@@ -2,6 +2,7 @@ import os
 import sys
 import itertools
 import pygame
+import random
 
 pygame.init()
 pygame.display.set_caption('Sonic')
@@ -20,8 +21,14 @@ def terminate():
     sys.exit()
 
 
-def start_screen():
-    pass
+def find_text_levels():
+    global lost_files
+    for i in range(3):
+        if os.path.isfile(f'data/levels/level_{i + 1}.txt'):
+            (sectors[i]).image = levels_image[i]
+        else:
+            (sectors[i]).image = none_table
+            lost_files.append(i + 1)
 
 
 def load_image(name, colorkey=None):
@@ -29,7 +36,10 @@ def load_image(name, colorkey=None):
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
         sys.exit()
-    image = pygame.image.load(fullname)
+    if name == 'background_main.png' or name == 'load_screen.png':
+        image = pygame.image.load(fullname).convert()
+    else:
+        image = pygame.image.load(fullname)
     if colorkey is not None:
         image = image.convert()
         if colorkey == -1:
@@ -46,10 +56,12 @@ def generate_level(level):
     new_enemies = {
         'rhino': []
     }
+    new_spikes = []
+
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '*':
-                Tile('spikes', x, y, tiles_group, all_sprites, spikes_group)
+                new_spikes.append(Tile('spikes', x, y, tiles_group, all_sprites, spikes_group))
             elif level[y][x] == '#':
                 Tile('ground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '%':
@@ -61,7 +73,7 @@ def generate_level(level):
             elif level[y][x] == '@':
                 new_player = Player(x, y)
 
-    return new_player, new_rings, new_enemies, x, y
+    return new_player, new_rings, new_enemies, new_spikes, x, y
 
 
 def load_level(filename):
@@ -74,17 +86,26 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
-def screen_update():
-    if not next_way_close:
-        camera.update(player)
-    for sprite in all_sprites:
-        camera.apply(sprite)
+def screen_update(key):
+    if key == 'level':
+        if not next_way_close:
+            camera.update(player)
+        for sprite in all_sprites:
+            camera.apply(sprite)
+        all_sprites.update()
+        all_sprites.draw(screen)
+        player_group.draw(screen)
+        pygame.display.flip()
 
-    all_sprites.update()
-    all_sprites.draw(screen)
-    player_group.draw(screen)
+    if key == 'overlay':
+        player_group.update()
+        player_group.draw(screen)
+        pygame.display.flip()
 
-    pygame.display.flip()
+    if key == 'save_menu':
+        saves_group.update()
+        saves_group.draw(screen)
+        pygame.display.flip()
 
 
 def image_ring_mainer(ring_count, rings):
@@ -94,6 +115,17 @@ def image_ring_mainer(ring_count, rings):
             rings_images.append(elem)
 
     return rings_images
+
+
+def rhino_collision(enemy):
+    for spike in spikes:
+        if enemy.rect.x == spike.rect.x + 68:
+            return 1
+
+        if enemy.rect.x + 97 == spike.rect.x:
+            return 2
+
+    return 0
 
 
 tile_images = {
@@ -107,6 +139,45 @@ player_image = load_image('idle.png', colorkey=-1)
 ghost_image = load_image('ghost.png')
 ring_image = load_image('ring.png', colorkey=-1)
 hurt_image = load_image('hurt.png', colorkey=-1)
+sonic_main = load_image('main_title.png')
+any_key = load_image('press_any_key.png')
+load_segment = load_image('window_load.png')
+load_segment_2 = load_image('window_load_menu_4.png')
+red_load_segment = load_image('red_window_load.png')
+red_square = load_image('red_square.png')
+data_select = load_image('data_select.png')
+none_table = load_image('table_level_none.png')
+back_image = load_image('back_image.png')
+level_1_image = load_image('table_level_1.png')
+level_2_image = load_image('table_level_2.png')
+level_3_image = load_image('table_level_3.png')
+levels_image = [level_1_image, level_2_image, level_3_image]
+
+hands = []
+hand_images = [load_image('main_hand.png'), load_image('main_hand_2.png'),
+               load_image('main_hand_3.png')]
+
+face = []
+half_face_images = [load_image('main_face.png'), load_image('main_face_2.png'),
+                    load_image('main_face_3.png')]
+
+button_list = []
+buttons_images = [load_image('press_any_key_2.png'), load_image('press_any_key_3.png'),
+                  load_image('press_any_key_4.png'), load_image('press_any_key_5.png'),
+                  load_image('press_any_key_6.png'), load_image('press_any_key.png'),
+                  load_image('press_any_key_6.png'), load_image('press_any_key_5.png'),
+                  load_image('press_any_key_4.png'), load_image('press_any_key_3.png'),
+                  load_image('press_any_key_2.png')]
+
+for i in hand_images:
+    for u in range(12):
+        hands.append(i)
+for i in half_face_images:
+    for u in range(12):
+        face.append(i)
+for i in buttons_images:
+    for u in range(12):
+        button_list.append(i)
 
 running_player_images = [load_image('run_1.png', colorkey=-1), load_image('run_2.png', colorkey=-1),
                          load_image('run_3.png', colorkey=-1), load_image('run_4.png', colorkey=-1)]
@@ -139,7 +210,9 @@ for i in walking:
     for u in range(3):
         walking_player_images.append(i)
 
-local_wall = load_image('thewall.png')
+local_wall = load_image('the_wall.png')
+local_overlay = load_image('background_main.png')
+local_menu = load_image('load_screen.png')
 
 rings = [load_image('ring.png', colorkey=-1), load_image('ring_2.png', colorkey=-1),
          load_image('ring_3.png', colorkey=-1), load_image('ring_4.png', colorkey=-1)]
@@ -149,11 +222,17 @@ rings_sunshine = [load_image('ring_shine.png', colorkey=-1), load_image('ring_sh
 
 rhino_image = load_image('rhino.png', colorkey=-1)
 
+rhino_turn_images = [load_image('rhino_2.png', colorkey=-1), load_image('rhino_3.png', colorkey=-1),
+                     load_image('rhino_4.png', colorkey=-1), load_image('rhino_5.png', colorkey=-1)]
+
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
 dust_cycle = itertools.cycle(dust_spindash_player_images)
 run_cycle = itertools.cycle(running_player_images)
+hand_cycle = itertools.cycle(hands)
+face_cycle = itertools.cycle(face)
+button_cycle = itertools.cycle(button_list)
 
 sound_ring = pygame.mixer.Sound("data/_music_/ring.wav")
 sound_ring.set_volume(0.2)
@@ -172,6 +251,12 @@ sound_lost_of_ring.set_volume(0.2)
 
 sound_spindash = pygame.mixer.Sound("data/_music_/sonic_spindash.mp3")
 sound_spindash.set_volume(0.2)
+
+sound_overlay = pygame.mixer.Sound("data/_music_/title_screen.flac")
+sound_overlay.set_volume(0.05)
+
+sound_load_level_menu = pygame.mixer.Sound("data/_music_/theme.flac")
+sound_load_level_menu.set_volume(0.2)
 
 tile_width = tile_height = 60
 
@@ -236,7 +321,7 @@ class Player(pygame.sprite.Sprite):
             screen.fill((0, 0, 0))
             screen.blit(local_wall, (x_field, y_field - 8))
             screen.blit(text2, (10, 25))
-            screen_update()
+            screen_update('level')
             while image_timer < 1000000:
                 image_timer += 1
             self.image = load_image('crouch_2.png', colorkey=-1)
@@ -271,8 +356,8 @@ class Ring(pygame.sprite.Sprite):
 
 
 class Ghost(pygame.sprite.Sprite):
-    def __init__(self, pos_x, pos_y):
-        super().__init__(player_group)
+    def __init__(self, pos_x, pos_y, group):
+        super().__init__(group)
         self.image = ghost_image
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
@@ -286,6 +371,14 @@ class Rhino(pygame.sprite.Sprite):
         self.width = self.image.get_rect().width
         self.height = self.image.get_rect().height
         self.rect = self.image.get_rect().move(35 * pos_x, self.height * pos_y + 40)
+
+        self.x_offset = 0
+        self.is_right = random.choice([True, False])
+        self.is_turning = False
+        self.turn_frame = 0
+
+    def flip(self, image):
+        self.image = pygame.transform.flip(image, True, False)
 
 
 class Camera:
@@ -303,11 +396,10 @@ class Camera:
 
 
 if __name__ == '__main__':
-    'game'
-
     player = None
     rings_plain = None
     enemies = None
+    spikes = None
     camera = Camera()
 
     all_sprites = pygame.sprite.Group()
@@ -317,20 +409,27 @@ if __name__ == '__main__':
     spikes_group = pygame.sprite.Group()
     rings_group = pygame.sprite.Group()
     enemy_group = pygame.sprite.Group()
+    saves_group = pygame.sprite.Group()
 
-    ghost_right = Ghost(615, 310)
-    ghost_left = Ghost(600, 310)
-    ghost_down = Ghost(608, 318)
+    overlay_group = pygame.sprite.Group()
 
-    start_screen()
+    ghost_right = Ghost(615, 310, player_group)
+    ghost_left = Ghost(600, 310, player_group)
+    ghost_down = Ghost(608, 318, player_group)
 
-    try:
-        player, rings_plain, enemies, level_x, level_y = generate_level(load_level('level.txt'))
-    except FileNotFoundError:
-        print('error')
-        terminate()
+    overlay_flag = 0
+    sonic = Ghost(400, 100, player_group)
+    hand = Ghost(664, 218, player_group)
+    half_face = Ghost(520, 186, player_group)
+    button = Ghost(450, 500, player_group)
+    local_overlay = local_overlay.convert_alpha()
+    sonic.image = sonic_main
+    button.image = any_key
+    hand.image = hand_images[0]
+    half_face.image = half_face_images[0]
 
-    rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+    local_menu = local_menu.convert_alpha()
+
     sonic_spin = False
     stop_jump = False
     complete_ring = []
@@ -338,353 +437,615 @@ if __name__ == '__main__':
     timer_shine = []
     clock = pygame.time.Clock()
     f2 = pygame.font.Font('data/fonts/Pixel_font_sonic.ttf', 30)
+    f1 = pygame.font.Font('data/fonts/andes.ttf', 70)
     running = True
     next_way_close = False
     one_shift = False
     two_shift = False
     rest = False
+
+    game_overlay = True
+    exit_overlay = False
+    flag_exit = 0
+    alpha_flag = 0
+
+    level_loaded_menu = False
+
     color = 'white'
     rest_timer = 0
     timer_dust = 0
     timer_walk = 0
     num_of_rings = 0
-    sound_theme.play()
+    sound_overlay.play()
 
     while running:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                player.move(event.key)
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT and not sonic_spin and not next_way_close:
-                    player.running = False
-                if event.key == pygame.K_DOWN and not sonic_spin and not player.jumping:
-                    player.main_crouching = False
+            if game_overlay:
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.KEYDOWN:
+                    exit_overlay = True
+
+            if level_loaded_menu:
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RIGHT and not rotating and segment_select != 3 and segment_select != -1:
+                        rotating = True
+                        segment_select += 1
+                        route = 'right'
+                    if event.key == pygame.K_LEFT and not rotating and segment_select != 1:
+                        rotating = True
+                        segment_select -= 1
+                        route = 'left'
+                    if event.key == pygame.K_LEFT and not rotating and segment_select == 1:
+                        rotating = True
+                        segment_select -= 1
+                        route = 'right_back'
+                    if event.key == pygame.K_RIGHT and not rotating and segment_select == -1:
+                        rotating = True
+                        segment_select += 1
+                        route = 'right_undo'
+                    if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE and not rotating:
+                        if lost_files:
+                            for i in lost_files:
+                                if i == segment_select:
+                                    close = True
+                                    break
+                                else:
+                                    close = False
+                        else:
+                            close = False
+                        if not close:
+                            if segment_select == -1:
+                                exited_data_select = True
+                            else:
+                                if segment_select == 1:
+                                    file = 'level_1' + '.txt'
+                                elif segment_select == 2:
+                                    file = 'level_2' + '.txt'
+                                elif segment_select == 3:
+                                    file = 'level_3' + '.txt'
+                                try:
+                                    player, rings_plain, enemies, spikes, level_x, level_y = generate_level(load_level(file))
+                                except FileNotFoundError:
+                                    print('error')
+                                    terminate()
+                                rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+                                level_loaded_menu = False
+                                sound_load_level_menu.stop()
+                                sound_theme.play()
+
+            elif not level_loaded_menu and not game_overlay:
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.KEYDOWN:
+                    player.move(event.key)
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT and not sonic_spin and not next_way_close:
+                        player.running = False
+                    if event.key == pygame.K_DOWN and not sonic_spin and not player.jumping:
+                        player.main_crouching = False
+                        if not next_way_close:
+                            y_field = -250
+                            player.rect.y -= 27
+                            player.crouching = False
+                        else:
+                            one_shift = True
                     if not next_way_close:
-                        y_field = -250
-                        player.rect.y -= 27
-                        player.crouching = False
-                    else:
-                        one_shift = True
-                if not next_way_close:
-                    player.smart_crouching = False
-                    player.spindashing = False
-                    one_shift = False
-                    two_shift = False
-                if timer_spindash > 0:
-                    if timer_spindash > 60:
-                        pass
-                    else:
-                        player.rect.y -= 24
-                timer_spindash = 0
-                if not player.spindashing and event.key == pygame.K_SPACE and player.main_crouching and not sonic_spin:
-                    player.rect.y -= 20
-                if player.spindashing and event.key == pygame.K_SPACE and not sonic_spin:
-                    if not next_way_close:
+                        player.smart_crouching = False
                         player.spindashing = False
-                    else:
-                        two_shift = True
-
-                if player.speed < 0:
-                    player.flip(player_image)
-                else:
-                    player.image = player_image
-
-        screen.fill((0, 0, 0))
-        screen.blit(local_wall, (x_field, y_field))
-        text2 = f2.render(f"RINGS:  {num_of_rings}", False, color)
-
-        screen.blit(text2, (10, 25))
-
-        changes_ring, num = False, None
-        for i, elem in enumerate(rings_plain):  # Ring load
-            elem.image = next(rings_cycle)
-            if 650 > elem.rect.x > 590 and (elem.rect.y == 336 or elem.rect.y == 319 or elem.rect.y == 335):
-                sound_ring.play()
-                complete_ring.append(elem)
-                timer_shine.append((elem, 0))
-                del rings_plain[i]
-                changes_ring = True
-                num_of_rings += 1
-
-        if changes_ring:
-            shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
-            rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
-
-        for i, elem in enumerate(complete_ring):
-            elem.image = next(shine_list[i])
-            for t in range(len(timer_shine)):
-                if timer_shine:
-                    if timer_shine[t][0] == elem:
-                        if timer_shine[t][1] > 45:
-                            del complete_ring[i]
-                            elem.image = ghost_image
+                        one_shift = False
+                        two_shift = False
+                    if timer_spindash > 0:
+                        if timer_spindash > 60:
+                            pass
                         else:
-                            timer_shine[t] = (elem, timer_shine[t][1] + 1)
-
-        if player.spindashing and player.smart_crouching and not next_way_close:
-            if timer_spindash > 60:
-                next_way_close = True
-                if timer_spindash == 61:
-                    if player.speed > 0:
-                        player.rect.x -= 43
-                image = next(dust_cycle)
-            else:
-                image = next(spindash_cycle)
-            player.image = image
-            if player.speed < 0:
-                player.flip(image)
-            timer_spindash += 1
-
-        elif player.spindashing and player.smart_crouching and next_way_close:
-            if one_shift and two_shift:
-                sound_spindash.play()
-                next_way_close = False
-                sonic_spin = True
-                field_speed = 7
-                player.spindashing = False
-                player.crouching = False
-                walk_key = False
-                finish_spin = False
-                flag_spindash = 0
-                spin_speed = 0
-                timer_dust = 0
-                timer_walk = 0
-            else:
-                timer_dust += 1
-                if timer_dust % 2 == 0:
-                    image = next(dust_cycle)
-                player.image = image
-                if player.speed < 0:
-                    player.flip(image)
-
-        if not next_way_close:
-            if sonic_spin and not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
-                    and not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
-                    not pygame.sprite.spritecollideany(ghost_down, spikes_group):
-                if flag_spindash == 0:
-                    player.rect.y -= 10
-                if player.speed > 0 and spin_speed == 0:
-                    spin_speed = 40
-                if player.speed < 0 and spin_speed == 0:
-                    spin_speed = -40
-                if flag_spindash % 10 == 0:
-                    field_speed -= 1
-                if field_speed <= 0:
-                    field_speed = 1
-                player.rect.x += spin_speed
-                if not finish_spin:
-                    if spin_speed > 0:
-                        x_field -= field_speed
-                    else:
-                        x_field += field_speed
-                j_image = next(jump_cycle)
-                player.image = j_image
-                flag_spindash += 1
-                if flag_spindash % 3 == 0 and not finish_spin:
-                    if spin_speed > 0:
-                        spin_speed -= 1
-                    else:
-                        spin_speed += 1
-
-                if player.jumping and not stop_jump:
-                    if not walk_key:
-                        player.rect.y -= 16
-                        y_field += 16
-                        walk_key = True
-
-                if not player.jumping and walk_key is True and pygame.sprite.spritecollideany(player, ground_group):
-                    timer_walk += 1
-                    esperate_timer = 0
-                    while esperate_timer != 100000:
-                        esperate_timer += 1
-                    j_image = next(walking_cycle)
-                    stop_jump = True
-                    finish_spin = True
-                    if timer_walk % 3 == 0:
-                        if spin_speed > 0:
-                            spin_speed -= 1
+                            player.rect.y -= 24
+                    timer_spindash = 0
+                    if not player.spindashing and event.key == pygame.K_SPACE and player.main_crouching and not sonic_spin:
+                        player.rect.y -= 20
+                    if player.spindashing and event.key == pygame.K_SPACE and not sonic_spin:
+                        if not next_way_close:
+                            player.spindashing = False
                         else:
-                            spin_speed += 1
-                        field_speed = 2
-                        if spin_speed > 0:
-                            x_field -= field_speed
-                        else:
-                            x_field += field_speed
-                else:
-                    j_image = next(jump_cycle)
-                player.image = j_image
-                if spin_speed < 0:
-                    player.flip(j_image)
-                if abs(spin_speed) == 1:
-                    if not finish_spin:
-                        player.rect.y -= 24
-                    sonic_spin = False
-                    player.image = player_image
-                    if spin_speed < 0:
-                        player.flip(player_image)
-                    stop_jump = False
-            elif sonic_spin and (pygame.sprite.spritecollideany(ghost_right, spikes_group)
-                                 or pygame.sprite.spritecollideany(ghost_left, spikes_group)) \
-                    and pygame.sprite.spritecollideany(player, ground_group):
-                sonic_spin = False
-                player.spindashing = False
-                player.crouching = False
-                finish_spin = False
-                stop_jump = False
-                player.rect.y -= 24
-                player.image = j_image
-                if player.speed < 0:
-                    player.rect.x += 20
-                    player.flip(j_image)
-                else:
-                    player.rect.x -= 20
-                y_field = -240
-                screen.blit(local_wall, (x_field, y_field))
-                screen_update()
+                            two_shift = True
 
-            elif sonic_spin and pygame.sprite.spritecollideany(ghost_down, spikes_group) and \
-                    not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
-                    not pygame.sprite.spritecollideany(ghost_right, spikes_group) and \
-                    not pygame.sprite.spritecollideany(player, ground_group):
-                sonic_spin = False
-
-            if player.running and not player.jumping and not sonic_spin:
-                if rest_timer == 1:
-                    if player.speed > 0:
-                        player.speed = 1
-                    else:
-                        player.speed = -1
-
-                color = 'white'
-                if -10 < player.speed < 0:
-                    if player.counter % 5 == 0:
-                        player.speed -= 1
-                    player.counter += 1
-
-                elif 10 > player.speed > 0:
-                    if player.counter % 5 == 0:
-                        player.speed += 1
-                    player.counter += 1
-                else:
-                    player.counter = 0
-
-                if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
-                    player.rect.x += player.speed
-                elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
-                    player.rect.x += player.speed
-                if not pygame.sprite.spritecollideany(ghost_left, spikes_group) and not pygame.sprite.spritecollideany(
-                        ghost_right, spikes_group):
-                    if player.speed > 0:
-                        x_field -= 1
-                    else:
-                        x_field += 1
-                if abs(player.speed) < 10:
-                    image = next(walking_cycle)
-                else:
-                    image = next(run_cycle)
-
-                player.image = image
-                if player.speed < 0:
-                    player.flip(image)
-            elif player.running and player.jumping and not sonic_spin and not player.damaged:
-                if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
-                    player.rect.x += player.speed
-                    if player.speed > 0:
-                        x_field -= 1
-                    else:
-                        x_field += 1
-                    if player.speed == 10:
-                        player.rect.x += 3
-                        x_field -= 1
-                    if player.speed == -10:
-                        player.rect.x -= 3
-                        x_field += 1
-                elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
-                    player.rect.x += player.speed
-                    if player.speed > 0:
-                        x_field -= 1
-                    else:
-                        x_field += 1
-                    if player.speed == 10:
-                        player.rect.x += 3
-                        x_field -= 1
-                    if player.speed == -10:
-                        player.rect.x -= 3
-                        x_field += 1
-
-            if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
-                player.rect.y -= player.speed_y
-                player.speed_y -= player.gravity
-                y_field += player.speed_y
-                y_field += player.gravity
-                j_image = next(jump_cycle)
-                player.image = j_image
-                if player.speed < 0:
-                    player.flip(j_image)
-                if player.speed_y < -18:
-                    player.speed_y = -18
-
-                if pygame.sprite.spritecollideany(player, ground_group):
-                    player.speed_y = 0
-                    player.jumping = False
                     if player.speed < 0:
                         player.flip(player_image)
                     else:
                         player.image = player_image
-                    if player.damaged:
-                        rest = True
-                        rest_timer = 0
-                    player.damaged = False
-                    y_field = -250
 
-            if player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group) and not player.damaged:
-                for elem in enemies['rhino']:
-                    if 650 > elem.rect.x > 520:
-                        enemies['rhino'].remove(elem)
-                        enemy_group.remove(elem)
-                        elem.image = ghost_image
-                        sound_lost_of_ring.play()
-                        player.speed_y = 18
-                        break
+        if game_overlay:
+            overlay_flag += 1
+            if 38 > overlay_flag > 0:
+                half_face.image = next(face_cycle)
+            if 158 > overlay_flag > 50:
+                hand.image = next(hand_cycle)
+            if overlay_flag == 200:
+                overlay_flag = 0
+            if overlay_flag % 5 == 0 and overlay_flag < 100 and not exit_overlay:
+                button.rect.y += 1
+            if overlay_flag % 5 == 0 and overlay_flag > 100 and not exit_overlay:
+                button.rect.y -= 1
+            if exit_overlay:
+                flag_exit += 1
+                button.rect.y += 15
+                half_face.rect.y += 15
+                hand.rect.y += 15
+                sonic.rect.y += 15
+            if flag_exit == 0 and alpha_flag < 255:
+                local_overlay.set_alpha(alpha_flag)
+                alpha_flag += 6
+            elif flag_exit > 0:
+                alpha_flag -= 6
+                local_overlay.set_alpha(alpha_flag)
+                if alpha_flag < 0:
+                    sound_overlay.stop()
+                    sound_load_level_menu.play()
+                    button.image = ghost_image
+                    sonic.image = ghost_image
+                    hand.image = ghost_image
+                    half_face.image = ghost_image
+                    game_overlay = False
+                    level_loaded_menu = True
+                    sector = Ghost(300, 72, saves_group)
+                    sector_2 = Ghost(630, 72, saves_group)
+                    sector_3 = Ghost(960, 72, saves_group)
+                    sectors = [sector, sector_2, sector_3]
+                    lost_files = []
+                    find_text_levels()
+                    window_load_menu = Ghost(300, 70, saves_group)
+                    window_load_menu.image = load_segment
+                    window_load_menu_2 = Ghost(630, 70, saves_group)
+                    window_load_menu_2.image = load_segment
+                    window_load_menu_3 = Ghost(960, 70, saves_group)
+                    window_load_menu_3.image = load_segment
+                    back_segment = Ghost(20, 70, saves_group)
+                    back_segment.image = back_image
+                    window_load_menu_4 = Ghost(10, 70, saves_group)
+                    window_load_menu_4.image = load_segment_2
+                    window_load_menu_red = Ghost(320, 70, saves_group)
+                    window_load_menu_red.image = red_load_segment
+                    rotating = False
+                    exited_data_select = False
+                    overlay_flag = 0
+                    saves_flag = 0
+                    saves_flag_2 = 0
+                    segment_select = 1
+                    parameter = ''
 
-            if (player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group)) or \
-                    (not player.jumping and
-                     (pygame.sprite.spritecollideany(ghost_right, enemy_group))):
-                player.jumping = True
-                player.speed_y = 18
-                player.damaged = True
+            screen.fill((0, 0, 0))
+            button.image = next(button_cycle)
+            screen.blit(local_overlay, (0, 0))
+            screen_update('overlay')
 
-                color = 'red'
-                sound_lost_of_ring.play()
-                if num_of_rings > 1:
-                    num_of_rings = 0
-
-            if player.damaged:
-                if player.speed > 0:
-                    player.rect.x -= 5
-                    x_field += 1
+        if level_loaded_menu:
+            saves_flag += 1
+            saves_flag_2 += 1
+            if saves_flag_2 == 104:
+                saves_flag_2 = 0
+            if saves_flag * 3 < 255:
+                local_menu.set_alpha(saves_flag * 3)
+            if saves_flag_2 % 8 == 0:
+                window_load_menu_red.image = ghost_image
+            elif saves_flag_2 % 4 == 0:
+                if parameter == 'square':
+                    window_load_menu_red.image = red_square
                 else:
-                    player.rect.x += 5
-                    x_field -= 1
-                player.image = hurt_image
+                    window_load_menu_red.image = red_load_segment
 
-            if rest and rest_timer != 101:
-                rest_timer += 1
-                if int(str(rest_timer)[0]) % 2 == 0:
-                    player.image = ghost_image
+            if rotating:
+                if segment_select == 1:
+                    x_task = 300
+                elif segment_select == 2:
+                    x_task = 630
+                elif segment_select == 3:
+                    x_task = 960
+                elif segment_select == 0:
+                    x_task = 290
+                elif segment_select == -1:
+                    x_task = 10
+
+            if rotating and route == 'right':
+                if window_load_menu_red.rect.x != x_task + 20:
+                    window_load_menu_red.rect.x += 10
                 else:
-                    if not player.running and not player.jumping and not player.crouching:
+                    rotating = False
+
+            if rotating and route == 'left':
+                if window_load_menu_red.rect.x != x_task + 20:
+                    window_load_menu_red.rect.x -= 10
+                else:
+                    rotating = False
+
+            if rotating and route == 'right_back':
+                if window_load_menu_red.rect.x != x_task - 100 and x_task != 10:
+                    window_load_menu_red.rect.x -= 10
+                elif window_load_menu_red.rect.x == x_task - 100 and x_task != 10:
+                    window_load_menu_red.image = red_square
+                    parameter = 'square'
+                    x_task = 10
+                    segment_select = -1
+                if window_load_menu_red.rect.x != x_task and x_task == 10:
+                    window_load_menu_red.rect.x -= 10
+                if window_load_menu_red.rect.x == x_task and x_task == 10:
+                    rotating = False
+
+            if rotating and route == 'right_undo':
+                if window_load_menu_red.rect.x != x_task - 100 and x_task != 300:
+                    window_load_menu_red.rect.x += 10
+                elif window_load_menu_red.rect.x == x_task - 100 and x_task != 300:
+                    window_load_menu_red.image = red_load_segment
+                    parameter = ''
+                    x_task = 300
+                    segment_select = 1
+                if window_load_menu_red.rect.x != x_task + 20 and x_task == 300:
+                    window_load_menu_red.rect.x += 10
+                if window_load_menu_red.rect.x == x_task + 20 and x_task == 300:
+                    rotating = False
+            if exited_data_select:
+                window_load_menu_red.image = ghost_image
+                game_overlay = True
+                exit_overlay = False
+                flag_exit = 0
+                alpha_flag = 0
+                overlay_flag = 0
+                sonic = Ghost(400, 100, player_group)
+                hand = Ghost(664, 218, player_group)
+                half_face = Ghost(520, 186, player_group)
+                button = Ghost(450, 500, player_group)
+                local_overlay = local_overlay.convert_alpha()
+                sonic.image = sonic_main
+                button.image = any_key
+                hand.image = hand_images[0]
+                half_face.image = half_face_images[0]
+                level_loaded_menu = False
+                sound_load_level_menu.stop()
+                sound_overlay.play()
+
+            screen.fill((0, 0, 0))
+            screen.blit(local_menu, (0, 0))
+            text2 = f1.render("data select", False, 'black')
+            screen.blit(text2, (665, 660))
+            screen_update('save_menu')
+
+        elif not game_overlay and not level_loaded_menu:
+            screen.blit(local_wall, (x_field, y_field))
+            text2 = f2.render(f"RINGS:  {num_of_rings}", False, color)
+            screen.blit(text2, (10, 25))
+            changes_ring, num = False, None
+            for i, elem in enumerate(rings_plain):  # Ring load
+                elem.image = next(rings_cycle)
+                if 650 > elem.rect.x > 590 and (elem.rect.y == 336 or elem.rect.y == 319 or elem.rect.y == 335):
+                    sound_ring.play()
+                    complete_ring.append(elem)
+                    timer_shine.append((elem, 0))
+                    del rings_plain[i]
+                    changes_ring = True
+                    num_of_rings += 1
+
+            for rhino in enemies['rhino']:
+                collision = rhino_collision(rhino)
+                if rhino.is_right:
+                    if not rhino.is_turning:
+                        rhino.flip(rhino_image)
+
+                    if rhino.is_turning:
+                        if rhino.turn_frame == 15:
+                            rhino.turn_frame = 0
+                            rhino.is_turning = False
+                        else:
+                            rhino.turn_frame += 1
+                            image = rhino_turn_images[rhino.turn_frame // 5]
+                            rhino.image = image
+                    elif rhino.x_offset < 200 and collision != 2:
+                        rhino.rect.x += 1
+                        rhino.x_offset += 1
+                    elif (rhino.x_offset >= 200 and collision != 1) or collision == 2:
+                        rhino.is_turning = True
+                        rhino.is_right = False
+                        rhino.rect.x -= 1
+                        rhino.x_offset -= 1
+                else:
+                    if not rhino.is_turning:
+                        rhino.image = rhino_image
+
+                    if rhino.is_turning:
+                        if rhino.turn_frame == 15:
+                            rhino.turn_frame = 0
+                            rhino.is_turning = False
+                        else:
+                            rhino.turn_frame += 1
+                            image = rhino_turn_images[rhino.turn_frame // 5]
+                            rhino.flip(image)
+                    elif rhino.x_offset > -200 and collision != 1:
+                        rhino.rect.x -= 1
+                        rhino.x_offset -= 1
+                    elif (rhino.x_offset <= -200 and collision != 2) or collision == 1:
+                        rhino.is_right = True
+                        rhino.is_turning = True
+                        rhino.rect.x += 1
+                        rhino.x_offset += 1
+
+            if changes_ring:
+                shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
+                rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+
+            for i, elem in enumerate(complete_ring):
+                elem.image = next(shine_list[i])
+                for t in range(len(timer_shine)):
+                    if timer_shine:
+                        if timer_shine[t][0] == elem:
+                            if timer_shine[t][1] > 45:
+                                del complete_ring[i]
+                                elem.image = ghost_image
+                            else:
+                                timer_shine[t] = (elem, timer_shine[t][1] + 1)
+
+            if player.spindashing and player.smart_crouching and not next_way_close:
+                if timer_spindash > 60:
+                    next_way_close = True
+                    if timer_spindash == 61:
+                        if player.speed > 0:
+                            player.rect.x -= 43
+                    image = next(dust_cycle)
+                else:
+                    image = next(spindash_cycle)
+                player.image = image
+                if player.speed < 0:
+                    player.flip(image)
+                timer_spindash += 1
+
+            elif player.spindashing and player.smart_crouching and next_way_close:
+                if one_shift and two_shift:
+                    sound_spindash.play()
+                    next_way_close = False
+                    sonic_spin = True
+                    field_speed = 7
+                    player.spindashing = False
+                    player.crouching = False
+                    walk_key = False
+                    finish_spin = False
+                    flag_spindash = 0
+                    spin_speed = 0
+                    timer_dust = 0
+                    timer_walk = 0
+                else:
+                    timer_dust += 1
+                    if timer_dust % 2 == 0:
+                        image = next(dust_cycle)
+                    player.image = image
+                    if player.speed < 0:
+                        player.flip(image)
+
+            if not next_way_close:
+                if sonic_spin and not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
+                        and not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
+                        not pygame.sprite.spritecollideany(ghost_down, spikes_group):
+                    if flag_spindash == 0:
+                        player.rect.y -= 10
+                    if player.speed > 0 and spin_speed == 0:
+                        spin_speed = 40
+                    if player.speed < 0 and spin_speed == 0:
+                        spin_speed = -40
+                    if flag_spindash % 10 == 0:
+                        field_speed -= 1
+                    if field_speed <= 0:
+                        field_speed = 1
+                    player.rect.x += spin_speed
+                    if not finish_spin:
+                        if spin_speed > 0:
+                            x_field -= field_speed
+                        else:
+                            x_field += field_speed
+                    j_image = next(jump_cycle)
+                    player.image = j_image
+                    flag_spindash += 1
+                    if flag_spindash % 3 == 0 and not finish_spin:
+                        if spin_speed > 0:
+                            spin_speed -= 1
+                        else:
+                            spin_speed += 1
+
+                    if player.jumping and not stop_jump:
+                        if not walk_key:
+                            player.rect.y -= 16
+                            y_field += 16
+                            walk_key = True
+
+                    if not player.jumping and walk_key is True and pygame.sprite.spritecollideany(player, ground_group):
+                        timer_walk += 1
+                        esperate_timer = 0
+                        while esperate_timer != 100000:
+                            esperate_timer += 1
+                        j_image = next(walking_cycle)
+                        stop_jump = True
+                        finish_spin = True
+                        if timer_walk % 3 == 0:
+                            if spin_speed > 0:
+                                spin_speed -= 1
+                            else:
+                                spin_speed += 1
+                            field_speed = 2
+                            if spin_speed > 0:
+                                x_field -= field_speed
+                            else:
+                                x_field += field_speed
+                    else:
+                        j_image = next(jump_cycle)
+                    player.image = j_image
+                    if spin_speed < 0:
+                        player.flip(j_image)
+                    if abs(spin_speed) == 1:
+                        if not finish_spin:
+                            player.rect.y -= 24
+                        sonic_spin = False
                         player.image = player_image
-            if rest_timer == 100:
-                rest = False
-                rest_timer = 0
+                        if spin_speed < 0:
+                            player.flip(player_image)
+                        stop_jump = False
+                elif sonic_spin and (pygame.sprite.spritecollideany(ghost_right, spikes_group)
+                                     or pygame.sprite.spritecollideany(ghost_left, spikes_group)) \
+                        and pygame.sprite.spritecollideany(player, ground_group):
+                    sonic_spin = False
+                    player.spindashing = False
+                    player.crouching = False
+                    finish_spin = False
+                    stop_jump = False
+                    player.rect.y -= 24
+                    player.image = j_image
+                    if player.speed < 0:
+                        player.rect.x += 20
+                        player.flip(j_image)
+                    else:
+                        player.rect.x -= 20
+                    y_field = -240
+                    screen.blit(local_wall, (x_field, y_field))
+                    screen_update('level')
 
-            if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
-                    not player.spindashing and not player.crouching and not sonic_spin:
-                player.rect.y -= 1
+                elif sonic_spin and pygame.sprite.spritecollideany(ghost_down, spikes_group) and \
+                        not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
+                        not pygame.sprite.spritecollideany(ghost_right, spikes_group) and \
+                        not pygame.sprite.spritecollideany(player, ground_group):
+                    sonic_spin = False
 
-        screen_update()
+                if player.running and not player.jumping and not sonic_spin:
+                    if rest_timer == 1:
+                        if player.speed > 0:
+                            player.speed = 1
+                        else:
+                            player.speed = -1
+
+                    color = 'white'
+                    if -10 < player.speed < 0:
+                        if player.counter % 5 == 0:
+                            player.speed -= 1
+                        player.counter += 1
+
+                    elif 10 > player.speed > 0:
+                        if player.counter % 5 == 0:
+                            player.speed += 1
+                        player.counter += 1
+                    else:
+                        player.counter = 0
+
+                    if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
+                        player.rect.x += player.speed
+                    elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
+                        player.rect.x += player.speed
+                    if not pygame.sprite.spritecollideany(ghost_left, spikes_group) and not pygame.sprite.spritecollideany(
+                            ghost_right, spikes_group):
+                        if player.speed > 0:
+                            x_field -= 1
+                        else:
+                            x_field += 1
+                    if abs(player.speed) < 10:
+                        image = next(walking_cycle)
+                    else:
+                        image = next(run_cycle)
+
+                    player.image = image
+                    if player.speed < 0:
+                        player.flip(image)
+                elif player.running and player.jumping and not sonic_spin and not player.damaged:
+                    if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
+                        player.rect.x += player.speed
+                        if player.speed > 0:
+                            x_field -= 1
+                        else:
+                            x_field += 1
+                        if player.speed == 10:
+                            player.rect.x += 3
+                            x_field -= 1
+                        if player.speed == -10:
+                            player.rect.x -= 3
+                            x_field += 1
+                    elif player.speed < 0 and not pygame.sprite.spritecollideany(ghost_left, spikes_group):
+                        player.rect.x += player.speed
+                        if player.speed > 0:
+                            x_field -= 1
+                        else:
+                            x_field += 1
+                        if player.speed == 10:
+                            player.rect.x += 3
+                            x_field -= 1
+                        if player.speed == -10:
+                            player.rect.x -= 3
+                            x_field += 1
+
+                if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
+                    player.rect.y -= player.speed_y
+                    player.speed_y -= player.gravity
+                    y_field += player.speed_y
+                    y_field += player.gravity
+                    j_image = next(jump_cycle)
+                    player.image = j_image
+                    if player.speed < 0:
+                        player.flip(j_image)
+                    if player.speed_y < -18:
+                        player.speed_y = -18
+
+                    if pygame.sprite.spritecollideany(player, ground_group):
+                        player.speed_y = 0
+                        player.jumping = False
+                        if player.speed < 0:
+                            player.flip(player_image)
+                        else:
+                            player.image = player_image
+                        if player.damaged:
+                            rest = True
+                            rest_timer = 0
+                        player.damaged = False
+                        y_field = -250
+
+                if player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group) and not player.damaged:
+                    for elem in enemies['rhino']:
+                        if 650 > elem.rect.x > 520:
+                            enemies['rhino'].remove(elem)
+                            enemy_group.remove(elem)
+                            elem.image = ghost_image
+                            sound_lost_of_ring.play()
+                            player.speed_y = 18
+                            break
+
+                if (player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group)) or \
+                        (not player.jumping and
+                         (pygame.sprite.spritecollideany(ghost_right, enemy_group))):
+                    player.jumping = True
+                    player.speed_y = 18
+                    player.damaged = True
+
+                    color = 'red'
+                    sound_lost_of_ring.play()
+                    if num_of_rings > 1:
+                        num_of_rings = 0
+
+                if player.damaged:
+                    if player.speed > 0:
+                        player.rect.x -= 5
+                        x_field += 1
+                    else:
+                        player.rect.x += 5
+                        x_field -= 1
+                    player.image = hurt_image
+
+                if rest and rest_timer != 101:
+                    rest_timer += 1
+                    if int(str(rest_timer)[0]) % 2 == 0:
+                        player.image = ghost_image
+                    else:
+                        if not player.running and not player.jumping and not player.crouching:
+                            player.image = player_image
+                if rest_timer == 100:
+                    rest = False
+                    rest_timer = 0
+
+                if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
+                        not player.spindashing and not player.crouching and not sonic_spin:
+                    player.rect.y -= 1
+
+            screen_update('level')
+            screen.fill((0, 0, 0))
         clock.tick(FPS)
     pygame.quit()
