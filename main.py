@@ -124,12 +124,18 @@ def screen_update(key):
 
     if key == 'death':
         all_sprites.draw(screen)
-        screen.blit(black_rect_image, (0, 0))
         black_rect_image.set_alpha(blackened)
-        if blackened == 255:
+        screen.blit(black_rect_image, (0, 0))
+
+        if blackened >= 150 and end_camera:
+            death_group.update()
+            death_group.draw(screen)
+            screen.blit(text_win, (425, 50))
+        elif blackened > 255:
             death_group.update()
             death_group.draw(screen)
             screen.blit(text_game_over, (370, 50))
+
         button_select_red.rect.y = 320 + selection_death * 120
         pygame.display.flip()
 
@@ -282,35 +288,38 @@ hand_cycle = itertools.cycle(hands)
 face_cycle = itertools.cycle(face)
 button_cycle = itertools.cycle(button_list)
 
-sound_ring = pygame.mixer.Sound("data/_music_/ring.wav")
+sound_ring = pygame.mixer.Sound("data/music/ring.wav")
 sound_ring.set_volume(0.2)
 
-sound_theme = pygame.mixer.Sound("data/_music_/mushroom_hill_act_1.flac")
+sound_theme = pygame.mixer.Sound("data/music/mushroom_hill_act_1.flac")
 sound_theme.set_volume(0.1)
 
-sound_jump = pygame.mixer.Sound("data/_music_/jump.wav")
+sound_jump = pygame.mixer.Sound("data/music/jump.wav")
 sound_jump.set_volume(0.2)
 
-sound_crouch = pygame.mixer.Sound("data/_music_/crouch.wav")
+sound_crouch = pygame.mixer.Sound("data/music/crouch.wav")
 sound_crouch.set_volume(0.2)
 
-sound_lost_of_ring = pygame.mixer.Sound("data/_music_/lost_ring.wav")
+sound_lost_of_ring = pygame.mixer.Sound("data/music/lost_ring.wav")
 sound_lost_of_ring.set_volume(0.2)
 
-sound_spindash = pygame.mixer.Sound("data/_music_/sonic_spindash.mp3")
+sound_spindash = pygame.mixer.Sound("data/music/sonic_spindash.mp3")
 sound_spindash.set_volume(0.2)
 
-sound_overlay = pygame.mixer.Sound("data/_music_/title_screen.flac")
+sound_overlay = pygame.mixer.Sound("data/music/title_screen.flac")
 sound_overlay.set_volume(0.05)
 
-sound_load_level_menu = pygame.mixer.Sound("data/_music_/theme.flac")
+sound_load_level_menu = pygame.mixer.Sound("data/music/theme.flac")
 sound_load_level_menu.set_volume(0.2)
 
-sound_death = pygame.mixer.Sound("data/_music_/death.mp3")
+sound_death = pygame.mixer.Sound("data/music/death.mp3")
 sound_death.set_volume(0.2)
 
-sound_game_over = pygame.mixer.Sound("data/_music_/game_over.mp3")
+sound_game_over = pygame.mixer.Sound("data/music/game_over.mp3")
 sound_game_over.set_volume(0.2)
+
+sound_stage_clear = pygame.mixer.Sound("data/music/stage_cleared.mp3")
+sound_stage_clear.set_volume(0.2)
 
 tile_width = tile_height = 60
 
@@ -405,6 +414,7 @@ class Player(pygame.sprite.Sprite):
                 end_camera = False
                 next_way_close = False
                 sonic_spin = False
+                black_flag = False
                 camera = Camera()
                 all_sprites = pygame.sprite.Group()
                 tiles_group = pygame.sprite.Group()
@@ -480,7 +490,8 @@ class Player(pygame.sprite.Sprite):
             self.rotate_pause, rotate = True, 'up'
             self.selection_pause -= 1
 
-        elif key == pygame.K_DOWN and not self.jumping and not sonic_spin and not pause:
+        elif key == pygame.K_DOWN and not self.jumping and not sonic_spin and \
+                not pause and not next_way_close:
             sound_crouch.play()
             image_timer = 0
             self.main_crouching = True
@@ -492,7 +503,7 @@ class Player(pygame.sprite.Sprite):
                 self.flip(self.image)
             screen.fill((0, 0, 0))
             screen.blit(local_wall, (x_field, y_field - 8))
-            screen.blit(text2, (10, 25))
+            screen.blit(text2, (200, 38))
             screen_update('level')
             while image_timer < 1000000:
                 image_timer += 1
@@ -508,7 +519,8 @@ class Player(pygame.sprite.Sprite):
         elif key == pygame.K_RIGHT and not self.damaged and not pause:
             self.running = True
             self.speed = 1
-        if key == pygame.K_SPACE and not self.jumping and not self.crouching and not stop_jump and not pause:
+        if key == pygame.K_SPACE and not self.jumping and not self.crouching and \
+                not stop_jump and not pause and not end_camera:
             self.jumping = True
             sound_jump.play()
             self.speed_y = 18
@@ -613,6 +625,7 @@ if __name__ == '__main__':
 
     sonic_spin = False
     stop_jump = False
+    black_flag = False
     complete_ring = []
     shine_list = []
     timer_shine = []
@@ -656,6 +669,7 @@ if __name__ == '__main__':
     selection_death = 0
     death_timer = 0
     text_game_over = f3.render("game over", False, (200, 28, 28))
+    text_win = f3.render("you win", False, (200, 28, 28))
     sound_overlay.play()
 
     while running:
@@ -737,7 +751,7 @@ if __name__ == '__main__':
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    if player.lifes > 0:
+                    if player.lifes > 0 and not end_camera:
                         player.move(event.key)
                     else:
                         if event.key == pygame.K_DOWN and selection_death < 2:
@@ -756,6 +770,7 @@ if __name__ == '__main__':
                                 pause = False
 
                                 end_camera = False
+                                black_flag = False
                                 next_way_close = False
                                 camera = Camera()
                                 all_sprites = pygame.sprite.Group()
@@ -1127,6 +1142,8 @@ if __name__ == '__main__':
                                 rhino.x_offset += 1
 
                 if flag_of_end.rect.x < 610 and not end_camera:
+                    sound_theme.stop()
+                    sound_stage_clear.play()
                     end_camera = True
                     if sonic_spin:
                         player.rect.y -= 14
@@ -1143,8 +1160,11 @@ if __name__ == '__main__':
                     if num_flag < 100:
                         flag_of_end.image = next(flags_cycle)
                     if num_flag == 100:
+                        black_flag = True
                         flag_of_end.rect.x -= 18
                         flag_of_end.image = finish_flag_image
+                    if blackened < 150 and end_camera and black_flag:
+                        blackened += 2
 
                 if changes_ring:
                     shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
@@ -1383,11 +1403,13 @@ if __name__ == '__main__':
                             player.damaged = False
                             y_field = -250
 
-                    if (player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group)) or \
+                    if (player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group) and
+                        not player.damaged) or \
                             (sonic_spin and
                              (pygame.sprite.spritecollideany(ghost_left, enemy_group) or
                               pygame.sprite.spritecollideany(ghost_right, enemy_group))) and \
                             not player.damaged and player.lifes > 0:
+                        print(player.jumping)
                         for elem in enemies['rhino']:
                             if 650 > elem.rect.x > 520:
                                 enemies['rhino'].remove(elem)
@@ -1447,11 +1469,10 @@ if __name__ == '__main__':
                             not player.spindashing and not player.crouching and not sonic_spin and player.lifes > 0:
                         player.rect.y -= 1
 
-                if player.lifes > 0:
+                if player.lifes > 0 and not end_camera:
                     screen.blit(text2, (200, 38))
                     screen_update('level')
                     screen.fill((0, 0, 0))
-
                 else:
                     player.running = False
                     player.speed = 0
@@ -1462,8 +1483,8 @@ if __name__ == '__main__':
                     elif death_timer % 8 == 0:
                         button_select_red.image = red_select_pause_image
 
-                    if blackened < 255:
-                        blackened += 1
+                    if blackened < 255 and not end_camera:
+                        blackened += 2
                     screen_update('death')
             else:
                 pause_timer += 1
