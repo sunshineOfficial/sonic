@@ -76,8 +76,10 @@ def generate_level(level):
                 new_rings.append(Ring(x, y))
             elif level[y][x] == '@':
                 new_player = Player(x, y)
+            elif level[y][x] == '!':
+                left_wall = BigLeftWall(x)
 
-    return new_player, flag, new_rings, new_enemies, new_spikes, x, y
+    return new_player, flag, left_wall, new_rings, new_enemies, new_spikes, x, y
 
 
 def load_level(filename):
@@ -92,7 +94,7 @@ def load_level(filename):
 
 def screen_update(key):
     if key == 'level':
-        if not next_way_close and player.lifes > 0 and not end_camera:
+        if not next_way_close and player.lifes > 0 and not end_camera and not left_blocked:
             camera.update(player)
             for sprite in all_sprites:
                 camera.apply(sprite)
@@ -191,6 +193,7 @@ black_rect_image = load_image('black_image_pause.png')
 level_1_image = load_image('table_level_1.png')
 level_2_image = load_image('table_level_2.png')
 level_3_image = load_image('table_level_3.png')
+left_wall_image = load_image('left_bold_wall.png', colorkey=-1)
 levels_image = [level_1_image, level_2_image, level_3_image]
 lifes_images = [load_image('lifes_1.png'), load_image('lifes_1.png'), load_image('lifes_2.png'),
                 load_image('lifes_3.png')]
@@ -370,7 +373,8 @@ class Player(pygame.sprite.Sprite):
         global sector, sector_2, sector_3, sectors, lost_files, window_load_menu, window_load_menu_2
         global window_load_menu_3, back_segment, window_load_menu_4, window_load_menu_red, rotating, blackened
         global exited_data_select, overlay_flag, saves_flag, saves_group, saves_flag_2, segment_select, parameter
-        global window_load_menu_5, exit_segment, flag_group, flag_of_end, end_camera, sonic_spin
+        global window_load_menu_5, exit_segment, flag_group, flag_of_end, end_camera, sonic_spin, left_wall
+        global left_blocked, x_normale, y_normale
         keys = pygame.key.get_pressed()
         if keys[pygame.K_DOWN] and keys[pygame.K_SPACE] and not self.jumping and not sonic_spin and \
                 not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
@@ -414,7 +418,7 @@ class Player(pygame.sprite.Sprite):
                 end_camera = False
                 next_way_close = False
                 sonic_spin = False
-                black_flag = False
+                left_blocked = False
                 camera = Camera()
                 all_sprites = pygame.sprite.Group()
                 tiles_group = pygame.sprite.Group()
@@ -426,7 +430,7 @@ class Player(pygame.sprite.Sprite):
                 flag_group = pygame.sprite.Group()
                 if self.selection_pause == 1:
                     try:
-                        player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                        player, flag_of_end, left_wall, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                             load_level(file))
                     except FileNotFoundError:
                         print('error')
@@ -502,7 +506,10 @@ class Player(pygame.sprite.Sprite):
             if self.speed < 0:
                 self.flip(self.image)
             screen.fill((0, 0, 0))
-            screen.blit(local_wall, (x_field, y_field - 8))
+            if not left_blocked:
+                screen.blit(local_wall, (x_field, y_field - 8))
+            else:
+                screen.blit(local_wall, (x_normale, y_normale))
             screen.blit(text2, (200, 38))
             screen_update('level')
             while image_timer < 1000000:
@@ -543,6 +550,13 @@ class Flag(pygame.sprite.Sprite):
     def __init__(self, pos_x):
         super().__init__(flag_group, all_sprites)
         self.image = start_flag_image
+        self.rect = self.image.get_rect().move(pos_x * 35, 53)
+
+
+class BigLeftWall(pygame.sprite.Sprite):
+    def __init__(self, pos_x):
+        super().__init__(flag_group, all_sprites)
+        self.image = left_wall_image
         self.rect = self.image.get_rect().move(pos_x * 35, 53)
 
 
@@ -634,6 +648,7 @@ if __name__ == '__main__':
     f1 = pygame.font.Font('data/fonts/andes.ttf', 70)
     f3 = pygame.font.Font('data/fonts/andes.ttf', 150)
     running = True
+    left_blocked = False
     next_way_close = False
     one_shift = False
     two_shift = False
@@ -677,7 +692,7 @@ if __name__ == '__main__':
             if game_overlay:
                 if event.type == pygame.QUIT:
                     running = False
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYDOWN and alpha_flag >= 255:
                     exit_overlay = True
 
             if level_loaded_menu:
@@ -737,7 +752,7 @@ if __name__ == '__main__':
                                 elif segment_select == 3:
                                     file = 'level_3' + '.txt'
                                 try:
-                                    player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                                    player, flag_of_end, left_wall, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                                         load_level(file))
                                 except FileNotFoundError:
                                     print('error')
@@ -770,7 +785,7 @@ if __name__ == '__main__':
                                 pause = False
 
                                 end_camera = False
-                                black_flag = False
+                                left_blocked = False
                                 next_way_close = False
                                 camera = Camera()
                                 all_sprites = pygame.sprite.Group()
@@ -783,7 +798,7 @@ if __name__ == '__main__':
                                 flag_group = pygame.sprite.Group()
                                 if selection_death == 0:
                                     try:
-                                        player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                                        player, flag_of_end, left_wall, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                                             load_level(file))
                                     except FileNotFoundError:
                                         print('error')
@@ -1082,8 +1097,10 @@ if __name__ == '__main__':
 
         elif not game_overlay and not level_loaded_menu:
             if not pause:
-                screen.blit(local_wall, (x_field, y_field))
-
+                if not left_blocked:
+                    screen.blit(local_wall, (x_field, y_field))
+                else:
+                    screen.blit(local_wall, (x_normale, y_normale))
                 text2 = f2.render(str(num_of_rings), False, color)
 
                 changes_ring, num = False, None
@@ -1150,7 +1167,7 @@ if __name__ == '__main__':
                         sonic_spin = False
                     next_way_close = True
                     num_flag = 0
-                if end_camera:
+                if end_camera and next_way_close:
                     player.running = True
                     player.rect.x += 10
                     player.image = next(run_cycle)
@@ -1485,6 +1502,32 @@ if __name__ == '__main__':
                     if blackened < 255 and not end_camera:
                         blackened += 2
                     screen_update('death')
+
+                if left_wall.rect.x > 0 and not end_camera and not left_blocked and player.speed < 0:
+                    left_blocked = True
+                    x_normale = x_field
+                    y_normale = y_field
+                    if sonic_spin:
+                        sonic_spin = False
+                        player.speed = -1
+                        image = player_image
+                        player.flip(image)
+                        player.image = image
+                        player.rect.y -= 24
+                        player.rect.x += 10
+
+                if left_blocked:
+                    if player.rect.x < 116:
+                        if sonic_spin:
+                            sonic_spin = False
+                            player.rect.y -= 14
+                            player.rect.x += 20
+                            player.speed = 1
+                            player.image = player_image
+                        player.rect.x = 116
+                    if player.rect.x > 608:
+                        left_blocked = False
+
             else:
                 pause_timer += 1
                 if pause_timer % 16 == 0:
