@@ -4,6 +4,7 @@ import itertools
 import pygame
 import random
 
+# инициализация программы
 pygame.init()
 pygame.display.set_caption('Sonic')
 size = WIDTH, HEIGHT = 1280, 720
@@ -16,11 +17,13 @@ y_field = -250
 x_field = -1000
 
 
+# функция для закрытия игры
 def terminate():
     pygame.quit()
     sys.exit()
 
 
+# функция для поиска уровней в директории игры
 def find_text_levels():
     global lost_files
     for i in range(3):
@@ -31,6 +34,7 @@ def find_text_levels():
             lost_files.append(i + 1)
 
 
+# функция для загрузки изображений
 def load_image(name, colorkey=None):
     fullname = os.path.join('data/images/', name)
     if not os.path.isfile(fullname):
@@ -51,6 +55,7 @@ def load_image(name, colorkey=None):
     return image
 
 
+# функция для генерации уровня
 def generate_level(level):
 
     new_player, x, y, flag = None, None, None, None
@@ -82,6 +87,7 @@ def generate_level(level):
     return new_player, flag, left_wall, new_rings, new_enemies, new_spikes, x, y
 
 
+# функция для загрузки уровня из файла
 def load_level(filename):
     filename = "data/levels/" + filename
     with open(filename, 'r') as mapFile:
@@ -92,7 +98,9 @@ def load_level(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), level_map))
 
 
-def screen_update(key):
+# функция для обновления кадра
+def screen_update(key):  # key используется по ситуации
+    # ключ для уровня
     if key == 'level':
         if not next_way_close and player.lifes > 0 and not end_camera and not left_blocked:
             camera.update(player)
@@ -105,16 +113,19 @@ def screen_update(key):
         screen.blit(ring_text_image, (20, 50))
         pygame.display.flip()
 
+    # ключ для вступительного меню
     if key == 'overlay':
         player_group.update()
         player_group.draw(screen)
         pygame.display.flip()
 
+    # ключ для главного меню
     if key == 'save_menu':
         saves_group.update()
         saves_group.draw(screen)
         pygame.display.flip()
 
+    # ключ для паузы
     if key == 'pause':
         all_sprites.draw(screen)
         screen.blit(black_rect_image, (0, 0))
@@ -124,6 +135,7 @@ def screen_update(key):
         screen.blit(text_pause, (525, 50))
         pygame.display.flip()
 
+    # ключ для смерти и победы
     if key == 'death':
         all_sprites.draw(screen)
         black_rect_image.set_alpha(blackened)
@@ -142,6 +154,7 @@ def screen_update(key):
         pygame.display.flip()
 
 
+# функция для синхронного вращения колец
 def image_ring_mainer(ring_count, rings):
     rings_images = []
     for elem in rings:
@@ -151,6 +164,7 @@ def image_ring_mainer(ring_count, rings):
     return rings_images
 
 
+# функция для проверки столкновений у rhino
 def rhino_collision(enemy):
     for spike in spikes:
         if enemy.rect.x == spike.rect.x + 68:
@@ -161,6 +175,7 @@ def rhino_collision(enemy):
     return 0
 
 
+# загрузка изображений
 tile_images = {
     'ground': load_image('ground.png'),
     'underground': load_image('underground.png'),
@@ -282,6 +297,7 @@ rhino_image = load_image('rhino.png', colorkey=-1)
 rhino_turn_images = [load_image('rhino_2.png', colorkey=-1), load_image('rhino_3.png', colorkey=-1),
                      load_image('rhino_4.png', colorkey=-1), load_image('rhino_5.png', colorkey=-1)]
 
+# создание циклов для анимации изображений
 jump_cycle = itertools.cycle(jumping_player_images)
 spindash_cycle = itertools.cycle(spindash_player_images)
 walking_cycle = itertools.cycle(walking_player_images)
@@ -291,6 +307,7 @@ hand_cycle = itertools.cycle(hands)
 face_cycle = itertools.cycle(face)
 button_cycle = itertools.cycle(button_list)
 
+# загрузка звуковых файлов
 sound_ring = pygame.mixer.Sound("data/music/ring.wav")
 sound_ring.set_volume(0.2)
 
@@ -327,6 +344,7 @@ sound_stage_clear.set_volume(0.2)
 tile_width = tile_height = 60
 
 
+# класс плитки
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y, *args):
         super().__init__(*args)
@@ -341,6 +359,7 @@ class Tile(pygame.sprite.Sprite):
                 self.width * pos_x, self.height * pos_y)
 
 
+# класс игрока
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(player_group, all_sprites)
@@ -364,6 +383,7 @@ class Player(pygame.sprite.Sprite):
         self.spindashing = False
         self.smart_crouching = False
 
+    # функция для обработки нажатий
     def move(self, key):
         global x_field, y_field, pause, pause_timer, button_select_red, rotate, running, selection_death
         global rings_cycle, level_loaded_menu, player, rings_plain, enemies, spikes, level_x, level_y
@@ -380,16 +400,13 @@ class Player(pygame.sprite.Sprite):
                 not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
                 and not pygame.sprite.spritecollideany(ghost_left, spikes_group) and not pause:
             self.spindashing = True
-
         elif (keys[pygame.K_DOWN] and keys[pygame.K_RIGHT]) or (keys[pygame.K_DOWN] and keys[pygame.K_LEFT]):
             pass
-
         elif key == pygame.K_ESCAPE and pause:
             pause = False
             pygame.mixer.unpause()
             self.running = False
             self.rotate_pause = False
-
         elif key == pygame.K_ESCAPE:
             pause = True
             pause_timer = 0
@@ -398,15 +415,17 @@ class Player(pygame.sprite.Sprite):
             button_select_red.rect.y = 200
             self.selection_pause = 0
             pygame.mixer.pause()
-
         elif key == pygame.K_RETURN and pause:
+            # продолжить игру
             if self.selection_pause == 0:
                 pause = False
                 pygame.mixer.unpause()
                 self.running = False
                 self.rotate_pause = False
+            # выход из игры
             elif self.selection_pause == 3:
                 running = False
+            # рестарт уровня или выход в меню
             elif self.selection_pause == 1 or self.selection_pause == 2:
                 pygame.mixer.unpause()
                 sound_theme.stop()
@@ -428,6 +447,7 @@ class Player(pygame.sprite.Sprite):
                 rings_group = pygame.sprite.Group()
                 enemy_group = pygame.sprite.Group()
                 flag_group = pygame.sprite.Group()
+                # если делаем рестарт
                 if self.selection_pause == 1:
                     try:
                         player, flag_of_end, left_wall, rings_plain, enemies, spikes, level_x, level_y = generate_level(
@@ -446,6 +466,7 @@ class Player(pygame.sprite.Sprite):
                 selection_death = 0
                 y_field = -250
                 x_field = -1000
+                # если выходим в меню
                 if self.selection_pause == 2:
                     saves_group = pygame.sprite.Group()
                     sound_load_level_menu.play()
@@ -482,18 +503,15 @@ class Player(pygame.sprite.Sprite):
                     saves_flag_2 = 0
                     segment_select = 1
                     parameter = ''
-
                 else:
                     level_loaded_menu = False
-
         elif key == pygame.K_DOWN and pause and self.selection_pause != 3:
             self.rotate_pause, rotate = True, 'down'
             self.selection_pause += 1
-
         elif key == pygame.K_UP and pause and self.selection_pause != 0:
             self.rotate_pause, rotate = True, 'up'
             self.selection_pause -= 1
-
+        # приседанаие
         elif key == pygame.K_DOWN and not self.jumping and not sonic_spin and \
                 not pause and not next_way_close:
             sound_crouch.play()
@@ -520,22 +538,27 @@ class Player(pygame.sprite.Sprite):
                 self.flip(self.image)
             self.smart_crouching = True
             y_field -= 19
+        # бег влево
         elif key == pygame.K_LEFT and not self.damaged and not pause:
             self.running = True
             self.speed = -1
+        # бег вправо
         elif key == pygame.K_RIGHT and not self.damaged and not pause:
             self.running = True
             self.speed = 1
+        # прыжок
         if key == pygame.K_SPACE and not self.jumping and not self.crouching and \
                 not stop_jump and not pause and not end_camera:
             self.jumping = True
             sound_jump.play()
             self.speed_y = 18
 
+    # функция для отзеркаливания изображения
     def flip(self, image):
         self.image = pygame.transform.flip(image, True, False)
 
 
+# класс колец
 class Ring(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(all_sprites, rings_group)
@@ -546,6 +569,7 @@ class Ring(pygame.sprite.Sprite):
             self.width * pos_x, (self.height * pos_y) + 60)
 
 
+# класс финишной таблички
 class Flag(pygame.sprite.Sprite):
     def __init__(self, pos_x):
         super().__init__(flag_group, all_sprites)
@@ -553,6 +577,7 @@ class Flag(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(pos_x * 35, 53)
 
 
+# класс стены, котороя не дает пройти за пределы карты
 class BigLeftWall(pygame.sprite.Sprite):
     def __init__(self, pos_x):
         super().__init__(flag_group, all_sprites)
@@ -560,6 +585,7 @@ class BigLeftWall(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(pos_x * 35, 53)
 
 
+# универсальный невидимый класс без коллизии
 class Ghost(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, *group):
         super().__init__(*group)
@@ -569,6 +595,7 @@ class Ghost(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(pos_x, pos_y)
 
 
+# класс врага (rhino)
 class Rhino(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(all_sprites, enemy_group)
@@ -586,6 +613,7 @@ class Rhino(pygame.sprite.Sprite):
         self.image = pygame.transform.flip(image, True, False)
 
 
+# класс камеры
 class Camera:
     def __init__(self):
         self.dx = 0
@@ -601,6 +629,7 @@ class Camera:
 
 
 if __name__ == '__main__':
+    # подготовка к игре
     player = None
     rings_plain = None
     enemies = None
@@ -687,14 +716,17 @@ if __name__ == '__main__':
     text_win = f3.render("you win", False, (200, 28, 28))
     sound_overlay.play()
 
+    # игровой цикл
     while running:
         for event in pygame.event.get():
+            # вступительный экран
             if game_overlay:
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN and alpha_flag >= 255:
                     exit_overlay = True
 
+            # меню выбора уровня
             if level_loaded_menu:
                 if event.type == pygame.QUIT:
                     running = False
@@ -761,19 +793,22 @@ if __name__ == '__main__':
                                 level_loaded_menu = False
                                 sound_load_level_menu.stop()
                                 sound_theme.play()
-
+            # игра
             elif not level_loaded_menu and not game_overlay:
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
+                    # если игра не завершена
                     if player.lifes > 0 and not end_camera:
                         player.move(event.key)
                     else:
+                        # выбор кнопки
                         if event.key == pygame.K_DOWN and selection_death < 2:
                             selection_death += 1
                         elif event.key == pygame.K_UP and selection_death > 0:
                             selection_death -= 1
                         elif event.key == pygame.K_RETURN:
+                            # рестарт уровня или выход в меню
                             if selection_death == 0 or selection_death == 1:
                                 sound_game_over.stop()
                                 pygame.mixer.unpause()
@@ -796,6 +831,7 @@ if __name__ == '__main__':
                                 rings_group = pygame.sprite.Group()
                                 enemy_group = pygame.sprite.Group()
                                 flag_group = pygame.sprite.Group()
+                                # если делаем рестарт
                                 if selection_death == 0:
                                     try:
                                         player, flag_of_end, left_wall, rings_plain, enemies, spikes, level_x, level_y = generate_level(
@@ -815,6 +851,7 @@ if __name__ == '__main__':
                                 blackened = 0
                                 y_field = -250
                                 x_field = -1000
+                                # если выходим в меню
                                 if selection_death == 1:
                                     selection_death = 0
                                     saves_group = pygame.sprite.Group()
@@ -858,6 +895,7 @@ if __name__ == '__main__':
                     if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT and \
                             not sonic_spin and not next_way_close and player.lifes > 0:
                         player.running = False
+                    # приседанаие
                     if event.key == pygame.K_DOWN and not sonic_spin and \
                             not player.jumping and player.lifes > 0 and not player.running:
                         player.main_crouching = False
@@ -881,6 +919,7 @@ if __name__ == '__main__':
                     if not player.spindashing and event.key == pygame.K_SPACE and \
                             player.main_crouching and not sonic_spin and player.lifes > 0:
                         player.rect.y -= 20
+                    # прыжок во время спиндеша
                     if player.spindashing and event.key == pygame.K_SPACE and \
                             not sonic_spin and player.lifes > 0:
                         if not next_way_close:
@@ -888,11 +927,13 @@ if __name__ == '__main__':
                         else:
                             two_shift = True
 
+                    # поворот игрока в ту сторону, в которую бежал
                     if player.speed < 0 and player.lifes > 0:
                         player.flip(player_image)
                     elif player.speed >= 0 and player.lifes > 0:
                         player.image = player_image
 
+        # вступительный экран
         if game_overlay:
             overlay_flag += 1
             if 38 > overlay_flag > 0:
@@ -963,6 +1004,7 @@ if __name__ == '__main__':
             screen.blit(local_overlay, (0, 0))
             screen_update('overlay')
 
+        # меню выбора уровня
         if level_loaded_menu:
             saves_flag += 1
             saves_flag_2 += 1
@@ -1094,7 +1136,7 @@ if __name__ == '__main__':
             text2 = f1.render("data select", False, 'black')
             screen.blit(text2, (665, 660))
             screen_update('save_menu')
-
+        # игра
         elif not game_overlay and not level_loaded_menu:
             if not pause:
                 if not left_blocked:
@@ -1103,6 +1145,7 @@ if __name__ == '__main__':
                     screen.blit(local_wall, (x_normale, y_normale))
                 text2 = f2.render(str(num_of_rings), False, color)
 
+                # собирание колец
                 changes_ring, num = False, None
                 for i, elem in enumerate(rings_plain):  # Ring load
                     elem.image = next(rings_cycle)
@@ -1115,6 +1158,7 @@ if __name__ == '__main__':
                         num_of_rings += 1
 
                 if player.lifes > 0:
+                    # движение врага ('rhino')
                     for rhino in enemies['rhino']:
                         collision = rhino_collision(rhino)
                         if rhino.is_right:
@@ -1158,6 +1202,7 @@ if __name__ == '__main__':
                                 rhino.rect.x += 1
                                 rhino.x_offset += 1
 
+                # если касаемся финишной таблички, то мы побеждаем
                 if flag_of_end.rect.x < 610 and not end_camera:
                     sound_theme.stop()
                     sound_stage_clear.play()
@@ -1183,10 +1228,12 @@ if __name__ == '__main__':
                     if blackened < 150 and end_camera and black_flag:
                         blackened += 2
 
+                # если собрали хотя бы одно кольцо
                 if changes_ring:
                     shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
                     rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
 
+                # удаление колец
                 for i, elem in enumerate(complete_ring):
                     elem.image = next(shine_list[i])
                     for t in range(len(timer_shine)):
@@ -1198,6 +1245,7 @@ if __name__ == '__main__':
                                 else:
                                     timer_shine[t] = (elem, timer_shine[t][1] + 1)
 
+                # разгон
                 if player.spindashing and player.smart_crouching and \
                         not next_way_close and player.lifes > 0:
                     if timer_spindash > 60:
@@ -1212,7 +1260,6 @@ if __name__ == '__main__':
                     if player.speed < 0:
                         player.flip(image)
                     timer_spindash += 1
-
                 elif player.spindashing and player.smart_crouching and \
                         next_way_close and player.lifes > 0:
                     if one_shift and two_shift:
@@ -1237,6 +1284,7 @@ if __name__ == '__main__':
                             player.flip(image)
 
                 if not next_way_close:
+                    # игрок катится
                     if sonic_spin and not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
                             and not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
                             not pygame.sprite.spritecollideany(ghost_down, spikes_group) and \
@@ -1304,6 +1352,7 @@ if __name__ == '__main__':
                             if spin_speed < 0:
                                 player.flip(player_image)
                             stop_jump = False
+                    # столновение во время катания
                     elif sonic_spin and (pygame.sprite.spritecollideany(ghost_right, spikes_group)
                                          or pygame.sprite.spritecollideany(ghost_left, spikes_group)) \
                             and pygame.sprite.spritecollideany(player, ground_group) and player.lifes > 0:
@@ -1322,13 +1371,13 @@ if __name__ == '__main__':
                         y_field = -240
                         screen.blit(local_wall, (x_field, y_field))
                         screen_update('level')
-
                     elif sonic_spin and pygame.sprite.spritecollideany(ghost_down, spikes_group) and \
                             not pygame.sprite.spritecollideany(ghost_left, spikes_group) and \
                             not pygame.sprite.spritecollideany(ghost_right, spikes_group) and \
                             not pygame.sprite.spritecollideany(player, ground_group) and player.lifes > 0:
                         sonic_spin = False
 
+                    # бег
                     if player.running and not player.jumping and not sonic_spin and player.lifes > 0:
                         if rest_timer == 1:
                             if player.speed > 0:
@@ -1367,6 +1416,7 @@ if __name__ == '__main__':
                         player.image = image
                         if player.speed < 0:
                             player.flip(image)
+                    # прыжок во время бега
                     elif player.running and player.jumping and not sonic_spin and \
                             not player.damaged and player.lifes > 0:
                         if player.speed > 0 and not pygame.sprite.spritecollideany(ghost_right, spikes_group):
@@ -1394,6 +1444,7 @@ if __name__ == '__main__':
                                 player.rect.x -= 3
                                 x_field += 1
 
+                    # прыжок
                     if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
                         player.rect.y -= player.speed_y
                         player.speed_y -= player.gravity
@@ -1420,6 +1471,7 @@ if __name__ == '__main__':
                             player.damaged = False
                             y_field = -250
 
+                    # уничтожение врагов
                     if (player.jumping and pygame.sprite.spritecollideany(ghost_down, enemy_group) and
                         not player.damaged) or \
                             (sonic_spin and
@@ -1436,6 +1488,7 @@ if __name__ == '__main__':
                                     player.speed_y = 18
                                 break
 
+                    # падение на шипы
                     if (player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group) and
                         not player.damaged) or \
                             (not player.jumping and
@@ -1461,6 +1514,7 @@ if __name__ == '__main__':
 
                             num_of_rings = 0
 
+                    # игроку нанесён урон
                     if player.damaged and player.lifes > 0:
                         if player.speed > 0:
                             player.rect.x -= 5
@@ -1470,6 +1524,7 @@ if __name__ == '__main__':
                             x_field -= 1
                         player.image = hurt_image
 
+                    # мигание игрока
                     if rest and rest_timer != 101 and player.lifes > 0:
                         rest_timer += 1
                         if int(str(rest_timer)[0]) % 2 == 0:
@@ -1481,10 +1536,12 @@ if __name__ == '__main__':
                         rest = False
                         rest_timer = 0
 
+                    # выравнивание игрока по y
                     if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
                             not player.spindashing and not player.crouching and not sonic_spin and player.lifes > 0:
                         player.rect.y -= 1
 
+                # если игрок жив
                 if player.lifes > 0 and not end_camera:
                     screen.blit(text2, (200, 38))
                     screen_update('level')
@@ -1503,6 +1560,7 @@ if __name__ == '__main__':
                         blackened += 2
                     screen_update('death')
 
+                # остновка камеры, если рядом граница
                 if left_wall.rect.x > 0 and not end_camera and not left_blocked and player.speed < 0:
                     left_blocked = True
                     x_normale = x_field
@@ -1516,6 +1574,7 @@ if __name__ == '__main__':
                         player.rect.y -= 24
                         player.rect.x += 10
 
+                # заблокировано
                 if left_blocked:
                     if player.rect.x < 116:
                         if sonic_spin:
@@ -1527,7 +1586,6 @@ if __name__ == '__main__':
                         player.rect.x = 116
                     if player.rect.x > 608:
                         left_blocked = False
-
             else:
                 pause_timer += 1
                 if pause_timer % 16 == 0:
