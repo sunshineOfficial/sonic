@@ -52,7 +52,8 @@ def load_image(name, colorkey=None):
 
 
 def generate_level(level):
-    new_player, x, y = None, None, None
+
+    new_player, x, y, flag = None, None, None, None
     new_rings = []
     new_enemies = {
         'rhino': []
@@ -67,6 +68,8 @@ def generate_level(level):
                 Tile('ground', x, y, tiles_group, all_sprites, ground_group)
             elif level[y][x] == '%':
                 Tile('underground', x, y, tiles_group, all_sprites, ground_group)
+            elif level[y][x] == '5':
+                flag = Flag(x)
             elif level[y][x] == '1':
                 new_enemies['rhino'].append(Rhino(x, y))
             elif level[y][x] == '&':
@@ -74,7 +77,7 @@ def generate_level(level):
             elif level[y][x] == '@':
                 new_player = Player(x, y)
 
-    return new_player, new_rings, new_enemies, new_spikes, x, y
+    return new_player, flag, new_rings, new_enemies, new_spikes, x, y
 
 
 def load_level(filename):
@@ -89,7 +92,7 @@ def load_level(filename):
 
 def screen_update(key):
     if key == 'level':
-        if not next_way_close and player.lifes > 0:
+        if not next_way_close and player.lifes > 0 and not end_camera:
             camera.update(player)
             for sprite in all_sprites:
                 camera.apply(sprite)
@@ -97,6 +100,7 @@ def screen_update(key):
         all_sprites.draw(screen)
         player_group.draw(screen)
         screen.blit(lifes_images[player.lifes], (20, 670))
+        screen.blit(ring_text_image, (20, 50))
         pygame.display.flip()
 
     if key == 'overlay':
@@ -115,7 +119,7 @@ def screen_update(key):
         black_rect_image.set_alpha(150)
         pause_group.update()
         pause_group.draw(screen)
-        screen.blit(text_pause, (0, 50))
+        screen.blit(text_pause, (525, 50))
         pygame.display.flip()
 
     if key == 'death':
@@ -146,7 +150,6 @@ def rhino_collision(enemy):
 
         if enemy.rect.x + 97 == spike.rect.x:
             return 2
-
     return 0
 
 
@@ -165,8 +168,10 @@ sonic_main = load_image('main_title.png')
 any_key = load_image('press_any_key.png')
 load_segment = load_image('window_load.png')
 load_segment_2 = load_image('window_load_menu_4.png')
+load_segment_3 = load_image('window_load_menu_5.png')
 red_load_segment = load_image('red_window_load.png')
 red_square = load_image('red_square.png')
+red_exit_square = load_image('red_square_exit.png')
 data_select = load_image('data_select.png')
 resume_button_image = load_image('resume_button.png')
 restart_button_image = load_image('restart_button.png')
@@ -175,6 +180,7 @@ menu_button_image = load_image('menu_pause.png')
 exit_button_image = load_image('exit_button_pause.png')
 none_table = load_image('table_level_none.png')
 back_image = load_image('back_image.png')
+exit_image = load_image('exit_load_button.png')
 black_rect_image = load_image('black_image_pause.png')
 level_1_image = load_image('table_level_1.png')
 level_2_image = load_image('table_level_2.png')
@@ -182,7 +188,17 @@ level_3_image = load_image('table_level_3.png')
 levels_image = [level_1_image, level_2_image, level_3_image]
 lifes_images = [load_image('lifes_1.png'), load_image('lifes_1.png'), load_image('lifes_2.png'),
                 load_image('lifes_3.png')]
+ring_text_image = load_image('rings_image.png')
 death_image = load_image('death.png', colorkey=-1)
+start_flag_image = load_image('flag.png')
+finish_flag_image = load_image('flag_5.png')
+ff = []
+flags_other_images = [load_image('flag_2.png'), load_image('flag_3.png'), load_image('flag_4.png')]
+for i in flags_other_images:
+    for u in range(2):
+        ff.append(i)
+flags_cycle = itertools.cycle(ff)
+
 
 hands = []
 hand_images = [load_image('main_hand.png'), load_image('main_hand_2.png'),
@@ -345,6 +361,7 @@ class Player(pygame.sprite.Sprite):
         global sector, sector_2, sector_3, sectors, lost_files, window_load_menu, window_load_menu_2
         global window_load_menu_3, back_segment, window_load_menu_4, window_load_menu_red, rotating, blackened
         global exited_data_select, overlay_flag, saves_flag, saves_group, saves_flag_2, segment_select, parameter
+        global window_load_menu_5, exit_segment, flag_group, flag_of_end, end_camera, sonic_spin
         keys = pygame.key.get_pressed()
         if keys[pygame.K_DOWN] and keys[pygame.K_SPACE] and not self.jumping and not sonic_spin and \
                 not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
@@ -385,6 +402,9 @@ class Player(pygame.sprite.Sprite):
                 enemies = None
                 spikes = None
                 pause = False
+                end_camera = False
+                next_way_close = False
+                sonic_spin = False
                 camera = Camera()
                 all_sprites = pygame.sprite.Group()
                 tiles_group = pygame.sprite.Group()
@@ -393,9 +413,10 @@ class Player(pygame.sprite.Sprite):
                 spikes_group = pygame.sprite.Group()
                 rings_group = pygame.sprite.Group()
                 enemy_group = pygame.sprite.Group()
+                flag_group = pygame.sprite.Group()
                 if self.selection_pause == 1:
                     try:
-                        player, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                        player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                             load_level(file))
                     except FileNotFoundError:
                         print('error')
@@ -432,8 +453,14 @@ class Player(pygame.sprite.Sprite):
                     back_segment.image = back_image
                     window_load_menu_4 = Ghost(10, 70, saves_group)
                     window_load_menu_4.image = load_segment_2
+                    window_load_menu_5 = Ghost(10, 400, saves_group)
+                    window_load_menu_5.image = load_segment_3
+                    exit_segment = Ghost(0, 400, saves_group)
+                    exit_segment.image = exit_image
+
                     window_load_menu_red = Ghost(320, 70, saves_group)
                     window_load_menu_red.image = red_load_segment
+
                     rotating = False
                     exited_data_select = False
                     overlay_flag = 0
@@ -500,6 +527,13 @@ class Ring(pygame.sprite.Sprite):
             self.width * pos_x, (self.height * pos_y) + 60)
 
 
+class Flag(pygame.sprite.Sprite):
+    def __init__(self, pos_x):
+        super().__init__(flag_group, all_sprites)
+        self.image = start_flag_image
+        self.rect = self.image.get_rect().move(pos_x * 35, 53)
+
+
 class Ghost(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, *group):
         super().__init__(*group)
@@ -556,7 +590,7 @@ if __name__ == '__main__':
     rings_group = pygame.sprite.Group()
     enemy_group = pygame.sprite.Group()
     saves_group = pygame.sprite.Group()
-
+    flag_group = pygame.sprite.Group()
     pause_group = pygame.sprite.Group()
     death_group = pygame.sprite.Group()
 
@@ -583,7 +617,7 @@ if __name__ == '__main__':
     shine_list = []
     timer_shine = []
     clock = pygame.time.Clock()
-    f2 = pygame.font.Font('data/fonts/Pixel_font_sonic.ttf', 30)
+    f2 = pygame.font.Font('data/fonts/Pixel_font_sonic.ttf', 29)
     f1 = pygame.font.Font('data/fonts/andes.ttf', 70)
     f3 = pygame.font.Font('data/fonts/andes.ttf', 150)
     running = True
@@ -591,7 +625,7 @@ if __name__ == '__main__':
     one_shift = False
     two_shift = False
     rest = False
-
+    end_camera = False
     game_overlay = True
     exit_overlay = False
     flag_exit = 0
@@ -612,7 +646,7 @@ if __name__ == '__main__':
     button_select_red.image = red_select_pause_image
     """end pause parameters --------------------------------"""
 
-    color = 'white'
+    color = 'yellow'
     rest_timer = 0
     timer_dust = 0
     timer_walk = 0
@@ -636,11 +670,13 @@ if __name__ == '__main__':
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RIGHT and not rotating and segment_select != 3 and segment_select != -1:
+                    if event.key == pygame.K_RIGHT and not rotating and segment_select != 3 and segment_select != -1 and \
+                            segment_select != -2:
                         rotating = True
                         segment_select += 1
                         route = 'right'
-                    if event.key == pygame.K_LEFT and not rotating and segment_select != 1 and segment_select != -1:
+                    if event.key == pygame.K_LEFT and not rotating and segment_select != 1 and segment_select != -1 and \
+                            segment_select != -2:
                         rotating = True
                         segment_select -= 1
                         route = 'left'
@@ -652,6 +688,18 @@ if __name__ == '__main__':
                         rotating = True
                         segment_select += 1
                         route = 'right_undo'
+                    if event.key == pygame.K_DOWN and not rotating and segment_select == -1:
+                        rotating = True
+                        segment_select -= 1
+                        route = 'down'
+                    if event.key == pygame.K_UP and not rotating and segment_select == -2:
+                        rotating = True
+                        segment_select += 1
+                        route = 'up'
+                    if event.key == pygame.K_RIGHT and not rotating and segment_select == -2:
+                        rotating = True
+                        segment_select = 1
+                        route = 'right_on_first'
                     if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE and not rotating:
                         if lost_files:
                             for i in lost_files:
@@ -665,6 +713,8 @@ if __name__ == '__main__':
                         if not close:
                             if segment_select == -1:
                                 exited_data_select = True
+                            elif segment_select == -2:
+                                running = False
                             else:
                                 if segment_select == 1:
                                     file = 'level_1' + '.txt'
@@ -673,7 +723,7 @@ if __name__ == '__main__':
                                 elif segment_select == 3:
                                     file = 'level_3' + '.txt'
                                 try:
-                                    player, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                                    player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                                         load_level(file))
                                 except FileNotFoundError:
                                     print('error')
@@ -704,6 +754,9 @@ if __name__ == '__main__':
                                 enemies = None
                                 spikes = None
                                 pause = False
+
+                                end_camera = False
+                                next_way_close = False
                                 camera = Camera()
                                 all_sprites = pygame.sprite.Group()
                                 tiles_group = pygame.sprite.Group()
@@ -712,13 +765,16 @@ if __name__ == '__main__':
                                 spikes_group = pygame.sprite.Group()
                                 rings_group = pygame.sprite.Group()
                                 enemy_group = pygame.sprite.Group()
+                                flag_group = pygame.sprite.Group()
                                 if selection_death == 0:
                                     try:
-                                        player, rings_plain, enemies, spikes, level_x, level_y = generate_level(
+                                        player, flag_of_end, rings_plain, enemies, spikes, level_x, level_y = generate_level(
                                             load_level(file))
                                     except FileNotFoundError:
                                         print('error')
                                         terminate()
+                                    next_way_close = False
+                                    end_camera = False
                                     rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
                                     level_loaded_menu = False
                                     sound_load_level_menu.stop()
@@ -751,6 +807,12 @@ if __name__ == '__main__':
                                     back_segment.image = back_image
                                     window_load_menu_4 = Ghost(10, 70, saves_group)
                                     window_load_menu_4.image = load_segment_2
+
+                                    window_load_menu_5 = Ghost(10, 400, saves_group)
+                                    window_load_menu_5.image = load_segment_3
+                                    exit_segment = Ghost(0, 400, saves_group)
+                                    exit_segment.image = exit_image
+
                                     window_load_menu_red = Ghost(320, 70, saves_group)
                                     window_load_menu_red.image = red_load_segment
                                     rotating = False
@@ -762,12 +824,12 @@ if __name__ == '__main__':
                                     parameter = ''
                             else:
                                 running = False
-                if event.type == pygame.KEYUP and not pause:
+                if event.type == pygame.KEYUP and not pause and not end_camera:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT and \
                             not sonic_spin and not next_way_close and player.lifes > 0:
                         player.running = False
                     if event.key == pygame.K_DOWN and not sonic_spin and \
-                            not player.jumping and player.lifes > 0:
+                            not player.jumping and player.lifes > 0 and not player.running:
                         player.main_crouching = False
                         if not next_way_close:
                             y_field = -250
@@ -850,6 +912,12 @@ if __name__ == '__main__':
                     back_segment.image = back_image
                     window_load_menu_4 = Ghost(10, 70, saves_group)
                     window_load_menu_4.image = load_segment_2
+
+                    window_load_menu_5 = Ghost(10, 400, saves_group)
+                    window_load_menu_5.image = load_segment_3
+                    exit_segment = Ghost(0, 400, saves_group)
+                    exit_segment.image = exit_image
+
                     window_load_menu_red = Ghost(320, 70, saves_group)
                     window_load_menu_red.image = red_load_segment
                     rotating = False
@@ -877,6 +945,8 @@ if __name__ == '__main__':
             elif saves_flag_2 % 4 == 0:
                 if parameter == 'square':
                     window_load_menu_red.image = red_square
+                elif parameter == 'exit_square':
+                    window_load_menu_red.image = red_exit_square
                 else:
                     window_load_menu_red.image = red_load_segment
 
@@ -891,6 +961,8 @@ if __name__ == '__main__':
                     x_task = 290
                 elif segment_select == -1:
                     x_task = 10
+                elif segment_select == -2:
+                    y_task = 400
 
             if rotating and route == 'right':
                 if window_load_menu_red.rect.x != x_task + 20:
@@ -929,6 +1001,43 @@ if __name__ == '__main__':
                     window_load_menu_red.rect.x += 10
                 if window_load_menu_red.rect.x == x_task + 20 and x_task == 300:
                     rotating = False
+
+            if rotating and route == 'down':
+                if window_load_menu_red.rect.y != y_task - 50 and parameter != 'exit_square':
+                    window_load_menu_red.rect.y += 10
+                elif window_load_menu_red.rect.y == y_task - 50 and parameter != 'exit_square':
+                    window_load_menu_red.image = red_square
+                    parameter = 'exit_square'
+                    segment_select = -2
+                if window_load_menu_red.rect.y != y_task and parameter == 'exit_square':
+                    window_load_menu_red.rect.y += 10
+                if window_load_menu_red.rect.y == y_task and parameter == 'exit_square':
+                    rotating = False
+
+            if rotating and route == 'up':
+                if window_load_menu_red.rect.y != 120 and parameter != 'square':
+                    window_load_menu_red.rect.y -= 10
+                elif window_load_menu_red.rect.y == 120 and parameter != 'square':
+                    window_load_menu_red.image = red_square
+                    parameter = 'square'
+                    segment_select = -1
+                if window_load_menu_red.rect.y != 70 and parameter == 'square':
+                    window_load_menu_red.rect.y -= 10
+                if window_load_menu_red.rect.y == 70 and parameter == 'square':
+                    rotating = False
+
+            if rotating and route == 'right_on_first':
+                if window_load_menu_red.rect.x != x_task + 20 and parameter != '':
+                    window_load_menu_red.rect.x += 10
+                elif window_load_menu_red.rect.x == x_task + 20 and parameter != '':
+                    window_load_menu_red.image = red_square
+                    parameter = ''
+                    segment_select = 1
+                if window_load_menu_red.rect.y != 70:
+                    window_load_menu_red.rect.y -= 10
+                if window_load_menu_red.rect.y == 70 and parameter == '':
+                    rotating = False
+
             if exited_data_select:
                 window_load_menu_red.image = ghost_image
                 game_overlay = True
@@ -959,8 +1068,8 @@ if __name__ == '__main__':
         elif not game_overlay and not level_loaded_menu:
             if not pause:
                 screen.blit(local_wall, (x_field, y_field))
-                text2 = f2.render(f"RINGS:  {num_of_rings}", False, color)
-                screen.blit(text2, (10, 25))
+
+                text2 = f2.render(str(num_of_rings), False, color)
 
                 changes_ring, num = False, None
                 for i, elem in enumerate(rings_plain):  # Ring load
@@ -1016,6 +1125,26 @@ if __name__ == '__main__':
                                 rhino.is_turning = True
                                 rhino.rect.x += 1
                                 rhino.x_offset += 1
+
+                if flag_of_end.rect.x < 610 and not end_camera:
+                    end_camera = True
+                    if sonic_spin:
+                        player.rect.y -= 14
+                        sonic_spin = False
+                    next_way_close = True
+                    num_flag = 0
+                if end_camera:
+                    player.running = True
+                    player.rect.x += 10
+                    player.image = next(run_cycle)
+                    if num_flag == 0:
+                        flag_of_end.rect.x += 15
+                    num_flag += 1
+                    if num_flag < 100:
+                        flag_of_end.image = next(flags_cycle)
+                    if num_flag == 100:
+                        flag_of_end.rect.x -= 18
+                        flag_of_end.image = finish_flag_image
 
                 if changes_ring:
                     shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
@@ -1170,7 +1299,7 @@ if __name__ == '__main__':
                             else:
                                 player.speed = -1
 
-                        color = 'white'
+                        color = 'yellow'
                         if -10 < player.speed < 0:
                             if player.counter % 5 == 0:
                                 player.speed -= 1
@@ -1319,8 +1448,10 @@ if __name__ == '__main__':
                         player.rect.y -= 1
 
                 if player.lifes > 0:
+                    screen.blit(text2, (200, 38))
                     screen_update('level')
                     screen.fill((0, 0, 0))
+
                 else:
                     player.running = False
                     player.speed = 0
@@ -1340,15 +1471,6 @@ if __name__ == '__main__':
                     button_select_red.image = ghost_image
                 elif pause_timer % 8 == 0:
                     button_select_red.image = red_select_pause_image
-                '''if player.rotate_pause:
-                    if player.selection_pause == 1:
-                        y_task = 200
-                    if player.selection_pause == 2:
-                        y_task = 200
-                    if player.selection_pause == 3:
-                        y_task = 200
-                    if player.selection_pause == 4:
-                        y_task = 200'''
 
                 if player.rotate_pause and rotate == 'down':
                     if button_select_red.rect.y != 200 + (player.selection_pause * 120):
@@ -1363,7 +1485,7 @@ if __name__ == '__main__':
                         player.rotate_pause = False
 
                 screen.blit(local_wall, (x_field, y_field))
-                text_pause = f3.render("                pause                ", False, (200, 28, 28))
+                text_pause = f3.render("pause", False, (200, 28, 28))
                 screen_update('pause')
 
         clock.tick(FPS)
