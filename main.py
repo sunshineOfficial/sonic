@@ -1409,7 +1409,6 @@ if __name__ == '__main__':
                              (pygame.sprite.spritecollideany(ghost_left, enemy_group) or
                               pygame.sprite.spritecollideany(ghost_right, enemy_group))) and \
                             not player.damaged and player.lifes > 0:
-                        print(player.jumping)
                         for elem in enemies['rhino']:
                             if 650 > elem.rect.x > 520:
                                 enemies['rhino'].remove(elem)
