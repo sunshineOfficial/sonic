@@ -1315,7 +1315,6 @@ if __name__ == '__main__':
                             player.damaged = True
                             sound_lost_of_ring.play()
                             player.damaged_from_fire = True
-                            # player.rect.y -= 10
                             player.jumping = True
                             player.speed_y = 15
 
@@ -1350,11 +1349,6 @@ if __name__ == '__main__':
                             if pygame.sprite.spritecollideany(fire, ground_group):
                                 del player.bullet[index]
                                 fire.image = ghost_image
-
-
-                        '''if fire.rect.y > 1000:
-                            del player.bullet[index]
-                            fire.image = ghost_image'''
 
                 # если касаемся финишной таблички, то мы побеждаем
                 if flag_of_end.rect.x < 610 and not end_camera:
