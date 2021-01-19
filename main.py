@@ -57,11 +57,11 @@ def load_image(name, colorkey=None):
 
 # функция для генерации уровня
 def generate_level(level):
-
-    new_player, x, y, flag = None, None, None, None
+    new_player, x, y, flag, left_wall = None, None, None, None, None
     new_rings = []
     new_enemies = {
-        'rhino': []
+        'rhino': [],
+        'buzzers': []
     }
     new_spikes = []
 
@@ -83,6 +83,8 @@ def generate_level(level):
                 new_player = Player(x, y)
             elif level[y][x] == '!':
                 left_wall = BigLeftWall(x)
+            elif level[y][x] == '^':
+                new_enemies['buzzers'].append(Buzzer(x, y))
 
     return new_player, flag, left_wall, new_rings, new_enemies, new_spikes, x, y
 
@@ -154,14 +156,13 @@ def screen_update(key):  # key используется по ситуации
         pygame.display.flip()
 
 
-# функция для синхронного вращения колец
-def image_ring_mainer(ring_count, rings):
-    rings_images = []
-    for elem in rings:
-        for other in range(ring_count * 5):
-            rings_images.append(elem)
-
-    return rings_images
+# функция для синхронного вращения изображений с большим количеством носителей
+def image_mainer(count, list):
+    images = []
+    for elem in list:
+        for other in range(count * 5):
+            images.append(elem)
+    return images
 
 
 # функция для проверки столкновений у rhino
@@ -222,6 +223,17 @@ for i in flags_other_images:
     for u in range(2):
         ff.append(i)
 flags_cycle = itertools.cycle(ff)
+
+buzzer_image = load_image('buzzer_1.png')
+buzzer_image_2 = load_image('buzzer_2.png')
+buzzer_image_3 = load_image('buzzer_3.png')
+buzzer_image_4 = load_image('buzzer_4.png')
+buzzer_main_list = [buzzer_image, buzzer_image_2, buzzer_image_3]
+
+burn_image = load_image('burn_buzzer.png')
+burn_image_2 = load_image('burn_buzzer_2.png')
+burn_list = [burn_image, burn_image_2]
+burn_cycle = itertools.cycle(burn_list)
 
 
 hands = []
@@ -375,6 +387,11 @@ class Player(pygame.sprite.Sprite):
         self.counter = 0
         self.lifes = 3
 
+        self.bullet = []
+        self.completely_buzz = []
+        self.buzz_timer = 0
+        self.damaged_from_fire = False
+
         self.crouching = False
         self.running = False
         self.main_crouching = False
@@ -394,7 +411,7 @@ class Player(pygame.sprite.Sprite):
         global window_load_menu_3, back_segment, window_load_menu_4, window_load_menu_red, rotating, blackened
         global exited_data_select, overlay_flag, saves_flag, saves_group, saves_flag_2, segment_select, parameter
         global window_load_menu_5, exit_segment, flag_group, flag_of_end, end_camera, sonic_spin, left_wall
-        global left_blocked, x_normale, y_normale
+        global left_blocked, x_normale, y_normale, buzzers_group, buzzer_cycle, fire_group
         keys = pygame.key.get_pressed()
         if keys[pygame.K_DOWN] and keys[pygame.K_SPACE] and not self.jumping and not sonic_spin and \
                 not pygame.sprite.spritecollideany(ghost_right, spikes_group) \
@@ -447,6 +464,8 @@ class Player(pygame.sprite.Sprite):
                 rings_group = pygame.sprite.Group()
                 enemy_group = pygame.sprite.Group()
                 flag_group = pygame.sprite.Group()
+                buzzers_group = pygame.sprite.Group()
+                fire_group = pygame.sprite.Group()
                 # если делаем рестарт
                 if self.selection_pause == 1:
                     try:
@@ -455,7 +474,8 @@ class Player(pygame.sprite.Sprite):
                     except FileNotFoundError:
                         print('error')
                         terminate()
-                    rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+                    rings_cycle = itertools.cycle(image_mainer(len(rings_plain), rings))
+                    buzzer_cycle = itertools.cycle(image_mainer(len(enemies['buzzers']), buzzer_main_list))
                     level_loaded_menu = False
                     sound_load_level_menu.stop()
                     sound_theme.play()
@@ -569,6 +589,38 @@ class Ring(pygame.sprite.Sprite):
             self.width * pos_x, (self.height * pos_y) + 60)
 
 
+# летающие противники
+class Buzzer(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        super().__init__(all_sprites, buzzers_group)
+        self.image = buzzer_image
+        self.width = self.image.get_rect().width
+        self.height = self.image.get_rect().height
+        self.rect = self.image.get_rect().move(
+            35 * pos_x, -70)
+        self.is_right = random.choice([True, False])
+        self.speed_shoot = random.choice([i for i in range(50, 150)])
+        self.ready_shoot = False
+        self.ready_timer = 0
+
+    def flip(self, image):
+        self.image = pygame.transform.flip(image, True, False)
+
+
+class FireBuzzer(pygame.sprite.Sprite):
+    def __init__(self, pos_x, rotate):
+        super().__init__(all_sprites, fire_group)
+        self.image = burn_image
+        if rotate:
+            self.rect = self.image.get_rect().move(pos_x - 17, 210)
+        else:
+            self.rect = self.image.get_rect().move(pos_x + 55, 217)
+        self.is_right = rotate
+
+    def flip(self, image):
+        self.image = pygame.transform.flip(image, True, False)
+
+
 # класс финишной таблички
 class Flag(pygame.sprite.Sprite):
     def __init__(self, pos_x):
@@ -648,6 +700,8 @@ if __name__ == '__main__':
     flag_group = pygame.sprite.Group()
     pause_group = pygame.sprite.Group()
     death_group = pygame.sprite.Group()
+    buzzers_group = pygame.sprite.Group()
+    fire_group = pygame.sprite.Group()
 
     ghost_right = Ghost(615, 310, player_group)
     ghost_left = Ghost(600, 310, player_group)
@@ -789,7 +843,8 @@ if __name__ == '__main__':
                                 except FileNotFoundError:
                                     print('error')
                                     terminate()
-                                rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+                                rings_cycle = itertools.cycle(image_mainer(len(rings_plain), rings))
+                                buzzer_cycle = itertools.cycle(image_mainer(len(enemies['buzzers']), buzzer_main_list))
                                 level_loaded_menu = False
                                 sound_load_level_menu.stop()
                                 sound_theme.play()
@@ -831,6 +886,8 @@ if __name__ == '__main__':
                                 rings_group = pygame.sprite.Group()
                                 enemy_group = pygame.sprite.Group()
                                 flag_group = pygame.sprite.Group()
+                                buzzers_group = pygame.sprite.Group()
+                                fire_group = pygame.sprite.Group()
                                 # если делаем рестарт
                                 if selection_death == 0:
                                     try:
@@ -841,7 +898,8 @@ if __name__ == '__main__':
                                         terminate()
                                     next_way_close = False
                                     end_camera = False
-                                    rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+                                    rings_cycle = itertools.cycle(image_mainer(len(rings_plain), rings))
+                                    buzzer_cycle = itertools.cycle(image_mainer(len(enemies['buzzers']), buzzer_main_list))
                                     level_loaded_menu = False
                                     sound_load_level_menu.stop()
                                     sound_theme.play()
@@ -1202,6 +1260,102 @@ if __name__ == '__main__':
                                 rhino.rect.x += 1
                                 rhino.x_offset += 1
 
+                changes_buzz = False
+                player.buzz_timer += 1
+                if player.lifes > 0:
+                    for index, buzz in enumerate(enemies['buzzers']):
+                        image_buzz = next(buzzer_cycle)
+                        if buzz.is_right:
+                            buzz.flip(image_buzz)
+                            if player.buzz_timer < 500:
+                                buzz.rect.x += 1
+                        else:
+                            buzz.image = image_buzz
+                            if player.buzz_timer < 500:
+                                buzz.rect.x -= 1
+                        if player.buzz_timer == 500:
+                            player.buzz_timer = 0
+                            if buzz.is_right:
+                                buzz.is_right = False
+                            else:
+                                buzz.is_right = True
+
+                        if player.buzz_timer % buzz.speed_shoot == 0 and not buzz.ready_shoot:
+                            buzz.ready_shoot = True
+                            buzz.ready_timer = 0
+                        if buzz.ready_shoot and buzz.ready_timer != 130:
+                            image_buzz = buzzer_image_4
+                            if buzz.is_right:
+                                buzz.flip(image_buzz)
+                            else:
+                                buzz.image = image_buzz
+                            buzz.ready_timer += 1
+                        if buzz.ready_timer == 130:
+                            buzz.ready_shoot = False
+                            buzz.ready_timer = 0
+                        if buzz.ready_timer == 100 and not player.jumping:
+                            player.bullet.append(FireBuzzer(buzz.rect.x, buzz.is_right))
+
+                        if 540 < buzz.rect.x < 660 and 320 < buzz.rect.y < 360:
+                            buzz.image = ghost_image
+                            sound_lost_of_ring.play()
+                            player.speed_y = 10
+                            player.completely_buzz.append(buzz)
+                            del enemies['buzzers'][index]
+                            changes_buzz = True
+
+                    if changes_buzz:
+                        buzzer_cycle = itertools.cycle(image_mainer(len(enemies['buzzers']), buzzer_main_list))
+
+                    if player.damaged_from_fire:
+                        player.damaged_from_fire = False
+
+                    for index, fire in enumerate(player.bullet):
+                        if pygame.sprite.spritecollideany(fire, player_group) and not player.damaged:
+                            player.damaged = True
+                            sound_lost_of_ring.play()
+                            player.damaged_from_fire = True
+                            # player.rect.y -= 10
+                            player.jumping = True
+                            player.speed_y = 15
+
+                            if num_of_rings == 0 and player.lifes > 0:
+                                player.lifes -= 1
+
+                            if player.lifes == 0:
+                                sound_theme.stop()
+                                sound_death.play()
+                                sound_game_over.play()
+                                player.speed_y = 18
+                                player.image = death_image
+
+                            num_of_rings = 0
+
+                            del player.bullet[index]
+
+                        if fire.is_right:
+                            fire.rect.x += 1
+                            fire.rect.y += 1
+                            if fire.rect.x % 8 == 0:
+                                image_burn = next(burn_cycle)
+                                fire.flip(image_burn)
+                        else:
+                            fire.rect.x -= 1
+                            fire.rect.y += 1
+                            if fire.rect.x % 8 == 0:
+                                fire.image = next(burn_cycle)
+                        if fire not in player.bullet:
+                            fire.image = ghost_image
+                        else:
+                            if pygame.sprite.spritecollideany(fire, ground_group):
+                                del player.bullet[index]
+                                fire.image = ghost_image
+
+
+                        '''if fire.rect.y > 1000:
+                            del player.bullet[index]
+                            fire.image = ghost_image'''
+
                 # если касаемся финишной таблички, то мы побеждаем
                 if flag_of_end.rect.x < 610 and not end_camera:
                     sound_theme.stop()
@@ -1213,6 +1367,11 @@ if __name__ == '__main__':
                     next_way_close = True
                     num_flag = 0
                 if end_camera and next_way_close:
+                    if player.jumping or not pygame.sprite.spritecollideany(player, ground_group):
+                        player.rect.y += 10
+                        player.jumping = False
+
+
                     player.running = True
                     player.rect.x += 10
                     player.image = next(run_cycle)
@@ -1230,8 +1389,8 @@ if __name__ == '__main__':
 
                 # если собрали хотя бы одно кольцо
                 if changes_ring:
-                    shine_list.append(itertools.cycle(image_ring_mainer(1, rings_sunshine)))
-                    rings_cycle = itertools.cycle(image_ring_mainer(len(rings_plain), rings))
+                    shine_list.append(itertools.cycle(image_mainer(1, rings_sunshine)))
+                    rings_cycle = itertools.cycle(image_mainer(len(rings_plain), rings))
 
                 # удаление колец
                 for i, elem in enumerate(complete_ring):
@@ -1416,6 +1575,7 @@ if __name__ == '__main__':
                         player.image = image
                         if player.speed < 0:
                             player.flip(image)
+
                     # прыжок во время бега
                     elif player.running and player.jumping and not sonic_spin and \
                             not player.damaged and player.lifes > 0:
@@ -1488,12 +1648,15 @@ if __name__ == '__main__':
                                     player.speed_y = 18
                                 break
 
+
+
                     # падение на шипы
+
                     if (player.jumping and pygame.sprite.spritecollideany(ghost_down, spikes_group) and
                         not player.damaged) or \
                             (not player.jumping and
                              pygame.sprite.spritecollideany(ghost_right, enemy_group) and
-                             not player.damaged) and player.lifes > 0:
+                             not player.damaged) and player.lifes > 0 and not player.damaged:
                         if not sonic_spin:
                             player.jumping = True
                             player.speed_y = 18
@@ -1516,6 +1679,8 @@ if __name__ == '__main__':
 
                     # игроку нанесён урон
                     if player.damaged and player.lifes > 0:
+                        if pygame.sprite.spritecollideany(ghost_down, spikes_group):
+                            player.speed_y = 15
                         if player.speed > 0:
                             player.rect.x -= 5
                             x_field += 1
@@ -1523,18 +1688,6 @@ if __name__ == '__main__':
                             player.rect.x += 5
                             x_field -= 1
                         player.image = hurt_image
-
-                    # мигание игрока
-                    if rest and rest_timer != 101 and player.lifes > 0:
-                        rest_timer += 1
-                        if int(str(rest_timer)[0]) % 2 == 0:
-                            player.image = ghost_image
-                        else:
-                            if not player.running and not player.jumping and not player.crouching:
-                                player.image = player_image
-                    if rest_timer == 100 and player.lifes > 0:
-                        rest = False
-                        rest_timer = 0
 
                     # выравнивание игрока по y
                     if not player.jumping and pygame.sprite.spritecollideany(ghost_down, ground_group) and \
